@@ -18,19 +18,26 @@ def get_upcoming_event_links():
     return event_links
 
 
-def get_fight_card(event_url):
+def get_fight_card(event_url: str):
     response = requests.get(event_url)
     soup = BeautifulSoup(response.text, "html.parser")
 
+    fight_rows = soup.select("tbody.b-fight-details__table-body tr")
     fights = []
 
-    for row in soup.select("tr.b-fight-details__table-row.b-fight-details__table-row__hover.js-fight-details-click"):
-        cols = row.find_all("td")
+    for row in fight_rows:
+        fighters = row.select("td.b-fight-details__table-col.l-page_align_left a.b-link")
+        if len(fighters) >= 2:
+            fighter_a = fighters[0].get_text(strip=True)
+            url_a = fighters[0]['href']
+            fighter_b = fighters[1].get_text(strip=True)
+            url_b = fighters[1]['href']
 
-        if len(cols) >= 2:
-            fighter_a = cols[1].select_one("p:nth-of-type(1)").get_text(strip=True)
-            fighter_b = cols[1].select_one("p:nth-of-type(2)").get_text(strip=True)
-            fights.append((fighter_a, fighter_b))
+            fights.append({
+                "fighter_a": fighter_a,
+                "url_a": url_a,
+                "fighter_b": fighter_b,
+                "url_b": url_b
+            })
 
     return fights
-
