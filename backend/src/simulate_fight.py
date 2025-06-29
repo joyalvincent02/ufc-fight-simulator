@@ -1,24 +1,7 @@
 import numpy as np
-from collections import Counter
 
-def simulate_fight(P_A, P_B, P_neutral, num_rounds, name_A, name_B,
-                   num_simulations=1000, steps_per_round=10):
-    """
-    Simulates multiple UFC fights between two fighters using biased random walk logic.
-
-    Args:
-        P_A (float): Probability Fighter A wins an exchange
-        P_B (float): Probability Fighter B wins an exchange
-        P_neutral (float): Probability of a neutral exchange
-        num_rounds (int): Number of rounds (typically 3 or 5)
-        name_A (str): Name of Fighter A
-        name_B (str): Name of Fighter B
-        num_simulations (int): Number of fights to simulate
-        steps_per_round (int): Number of exchanges per round
-
-    Returns:
-        dict: {'Fighter A': win %, 'Fighter B': win %, 'Draw': draw %}
-    """
+def simulate_fight(P_A, P_B, P_neutral, num_rounds, name_A=None, name_B=None, num_simulations=1000):
+    steps_per_round = 10
     outcomes = []
 
     for _ in range(num_simulations):
@@ -29,14 +12,12 @@ def simulate_fight(P_A, P_B, P_neutral, num_rounds, name_A, name_B,
             rand_vals = np.random.rand(steps_per_round)
             steps = np.zeros(steps_per_round)
 
-            # Assign outcomes for each exchange
             steps[rand_vals < P_A] = 1
             steps[(rand_vals >= P_A) & (rand_vals < P_A + P_neutral)] = 0
             steps[rand_vals >= P_A + P_neutral] = -1
 
             round_score = np.sum(steps)
 
-            # Apply 10-point must scoring
             if round_score > 0:
                 score_A += 10
                 score_B += 9
@@ -47,7 +28,6 @@ def simulate_fight(P_A, P_B, P_neutral, num_rounds, name_A, name_B,
                 score_A += 10
                 score_B += 10
 
-        # Determine winner
         if score_A > score_B:
             outcomes.append(name_A)
         elif score_B > score_A:
@@ -55,11 +35,12 @@ def simulate_fight(P_A, P_B, P_neutral, num_rounds, name_A, name_B,
         else:
             outcomes.append("Draw")
 
-    counts = Counter(outcomes)
-    results = {
-        name_A: (counts[name_A] / num_simulations) * 100,
-        name_B: (counts[name_B] / num_simulations) * 100,
-        "Draw": (counts["Draw"] / num_simulations) * 100,
-    }
+    n_A = outcomes.count(name_A)
+    n_B = outcomes.count(name_B)
+    n_D = outcomes.count("Draw")
 
-    return results
+    return {
+        name_A: (n_A / num_simulations) * 100,
+        name_B: (n_B / num_simulations) * 100,
+        "Draw": (n_D / num_simulations) * 100
+    }
