@@ -33,13 +33,16 @@ export default function SimulatePage() {
       .finally(() => setLoading(false));
   }, [eventId]);
 
-  if (loading) return <div className="p-4">Simulating full event...</div>;
-  if (error) return <div className="p-4 text-red-600">Error: {error}</div>;
+  if (loading) return <div className="p-6 text-lg">Simulating full event...</div>;
+  if (error) return <div className="p-6 text-red-600">Error: {error}</div>;
   if (!data) return null;
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Simulation: {data.event}</h1>
+    <div className="max-w-4xl mx-auto p-4 md:p-6">
+      <h1 className="text-2xl md:text-3xl font-bold mb-6 text-center">
+        Simulated Card: {data.event}
+      </h1>
+
       <div className="space-y-6">
         {data.fights.map((fight, i) => {
           const [A, B] = fight.fighters;
@@ -47,19 +50,28 @@ export default function SimulatePage() {
           const results = fight.results;
 
           return (
-            <div key={i} className="p-4 rounded bg-gray-100">
-              <h2 className="text-lg font-semibold mb-2">
+            <div key={i} className="bg-white rounded-2xl shadow p-4 md:p-6">
+              <h2 className="text-xl font-semibold text-center mb-4">
                 {A} vs {B}
               </h2>
-              <div className="text-sm mb-1">Exchange Probabilities</div>
-              <p>{A}: {(P_A * 100).toFixed(1)}%</p>
-              <p>{B}: {(P_B * 100).toFixed(1)}%</p>
-              <p>Neutral: {(P_neutral * 100).toFixed(1)}%</p>
 
-              <div className="text-sm mt-4 mb-1">Simulation Results</div>
-              <p>{A} Wins: {results[A]?.toFixed(1) ?? "N/A"}%</p>
-              <p>{B} Wins: {results[B]?.toFixed(1) ?? "N/A"}%</p>
-              <p>Draws: {results["Draw"]?.toFixed(1) ?? "N/A"}%</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="text-center">
+                  <p className="text-lg font-bold">{A}</p>
+                  <p className="text-sm text-gray-600">Win %: {results[A]?.toFixed(1)}%</p>
+                  <p className="text-sm text-gray-500">Exchange Chance: {(P_A * 100).toFixed(1)}%</p>
+                </div>
+
+                <div className="text-center">
+                  <p className="text-lg font-bold">{B}</p>
+                  <p className="text-sm text-gray-600">Win %: {results[B]?.toFixed(1)}%</p>
+                  <p className="text-sm text-gray-500">Exchange Chance: {(P_B * 100).toFixed(1)}%</p>
+                </div>
+              </div>
+
+              <div className="mt-4 text-center text-sm text-gray-600">
+                Neutral Exchanges: {(P_neutral * 100).toFixed(1)}% | Draws: {results["Draw"]?.toFixed(1)}%
+              </div>
             </div>
           );
         })}
