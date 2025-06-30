@@ -4,7 +4,6 @@ from fight_model import calculate_exchange_probabilities
 from simulate_fight import simulate_fight
 from src.db import SessionLocal, Fighter
 
-
 def simulate_event(event_url):
     print(f"\n🎯 Simulating fights for event: {event_url}\n")
     card = get_fight_card(event_url)
@@ -25,6 +24,10 @@ def simulate_event(event_url):
 
         print(f"🔍 {name_a} vs {name_b}")
         print(f"→ Exchange Probabilities:\n  {name_a}: {P_A:.3f}, {name_b}: {P_B:.3f}, Neutral: {P_neutral:.3f}")
+        
+        # ✅ Print image URLs
+        print(f"🖼️ {name_a} Image: {fighter_a.image_url or '❌ No image'}")
+        print(f"🖼️ {name_b} Image: {fighter_b.image_url or '❌ No image'}")
 
         results = simulate_fight(P_A, P_B, P_neutral, num_rounds=5, name_A=name_a, name_B=name_b)
         print(f"{name_a} win rate: {results[name_a]:.1f}%")
@@ -33,7 +36,6 @@ def simulate_event(event_url):
         print("-" * 50)
 
     db.close()
-
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:

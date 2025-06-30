@@ -16,6 +16,7 @@ class Fighter(Base):
 
     name = Column(String, primary_key=True, index=True)
     profile_url = Column(String, nullable=False)
+    image_url = Column(String, nullable=True)
     slpm = Column(Float)
     str_acc = Column(Float)
     str_def = Column(Float)

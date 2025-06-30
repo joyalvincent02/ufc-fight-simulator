@@ -29,10 +29,17 @@ def scrape_fighter_stats(name: str, profile_url: str):
         print(f"Label not found: {label_keyword}")
         return None
 
+    def extract_image_url():
+        img_tag = soup.find("img", class_="c-hero__image")
+        if img_tag and img_tag.get("src"):
+            return img_tag["src"]
+        return None
+
     try:
         stats = {
             "name": name,
             "profile_url": profile_url,
+            "image_url": extract_image_url(),
             "slpm": extract_stat("SLpM"),
             "str_acc": extract_stat("Str. Acc"),
             "str_def": extract_stat("Str. Def"),
@@ -61,9 +68,29 @@ def save_fighter_to_db(fighter_data):
     existing = db.query(Fighter).filter(Fighter.name == fighter_data["name"]).first()
 
     if existing:
-        print(f"{fighter_data['name']} already in DB — skipping insert.")
+        updated = False
+        if not existing.image_url and fighter_data.get("image_url"):
+            existing.image_url = fighter_data["image_url"]
+            updated = True
+        if updated:
+            db.commit()
+            print(f"🛠️ Updated {fighter_data['name']} with image_url.")
+        else:
+            print(f"{fighter_data['name']} already in DB — no update needed.")
     else:
-        fighter = Fighter(**fighter_data)
+        fighter = Fighter(
+            name=fighter_data["name"],
+            profile_url=fighter_data["profile_url"],
+            image_url=fighter_data.get("image_url"),
+            slpm=fighter_data["slpm"],
+            str_acc=fighter_data["str_acc"],
+            str_def=fighter_data["str_def"],
+            td_avg=fighter_data["td_avg"],
+            td_acc=fighter_data["td_acc"],
+            td_def=fighter_data["td_def"],
+            sub_avg=fighter_data["sub_avg"],
+            last_updated=fighter_data["last_updated"]
+        )
         db.add(fighter)
         db.commit()
         print(f"✅ {fighter.name} added to DB.")

@@ -2,8 +2,13 @@ import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { simulateEvent } from "../services/api";
 
+type Fighter = {
+  name: string;
+  image?: string;
+};
+
 type SimFight = {
-  fighters: [string, string];
+  fighters: [Fighter, Fighter];
   probabilities: {
     P_A: number;
     P_B: number;
@@ -12,12 +17,16 @@ type SimFight = {
   results: {
     [fighter: string]: number;
   };
+  error?: string;
 };
 
 type SimData = {
   event: string;
   fights: SimFight[];
 };
+
+const FALLBACK_IMAGE =
+  "https://www.ufc.com/themes/custom/ufc/assets/img/no-profile-image.png";
 
 export default function SimulatePage() {
   const { eventId } = useParams();
@@ -50,28 +59,43 @@ export default function SimulatePage() {
           const results = fight.results;
 
           return (
-            <div key={i} className="bg-white rounded-2xl shadow p-4 md:p-6">
+            <div
+              key={i}
+              className="bg-white rounded-2xl shadow p-4 md:p-6 border border-gray-200"
+            >
               <h2 className="text-xl font-semibold text-center mb-4">
-                {A} vs {B}
+                {A.name} vs {B.name}
               </h2>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="text-center">
-                  <p className="text-lg font-bold">{A}</p>
-                  <p className="text-sm text-gray-600">Win %: {results[A]?.toFixed(1)}%</p>
-                  <p className="text-sm text-gray-500">Exchange Chance: {(P_A * 100).toFixed(1)}%</p>
-                </div>
-
-                <div className="text-center">
-                  <p className="text-lg font-bold">{B}</p>
-                  <p className="text-sm text-gray-600">Win %: {results[B]?.toFixed(1)}%</p>
-                  <p className="text-sm text-gray-500">Exchange Chance: {(P_B * 100).toFixed(1)}%</p>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[A, B].map((f, idx) => (
+                  <div key={idx} className="flex flex-col items-center text-center">
+                    <img
+                      src={f.image || FALLBACK_IMAGE}
+                      alt={f.name}
+                      className="w-24 h-24 rounded-full object-cover border mb-2"
+                    />
+                    <p className="text-lg font-bold">{f.name}</p>
+                    <p className="text-sm text-gray-600">
+                      Win %: {results[f.name]?.toFixed(1)}%
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Exchange Chance: {((idx === 0 ? P_A : P_B) * 100).toFixed(2)}%
+                    </p>
+                  </div>
+                ))}
               </div>
 
               <div className="mt-4 text-center text-sm text-gray-600">
-                Neutral Exchanges: {(P_neutral * 100).toFixed(1)}% | Draws: {results["Draw"]?.toFixed(1)}%
+                Neutral Exchanges: {(P_neutral * 100).toFixed(2)}% | Draws:{" "}
+                {results["Draw"]?.toFixed(1)}%
               </div>
+
+              {fight.error && (
+                <div className="mt-2 text-center text-red-500">
+                  ⚠️ {fight.error}
+                </div>
+              )}
             </div>
           );
         })}
