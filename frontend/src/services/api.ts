@@ -7,7 +7,7 @@ export async function getEvents() {
 }
 
 export async function simulateEvent(eventId: string) {
-  const res = await fetch(`${BASE_URL}/simulate/${eventId}`);
+  const res = await fetch(`${BASE_URL}/simulate-event/${eventId}`);
   if (!res.ok) throw new Error('Failed to simulate event');
   return res.json();
 }
