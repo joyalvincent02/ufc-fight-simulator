@@ -1,6 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
-from db import Fighter, SessionLocal
+from src.db import Fighter, SessionLocal
 from datetime import datetime
 
 def scrape_fighter_stats(name: str, profile_url: str):

@@ -1,7 +1,7 @@
 import sys
 from ufc_scraper import get_fight_card
 from fighter_scraper import scrape_fighter_stats, save_fighter_to_db
-from db import SessionLocal, Fighter
+from src.db import SessionLocal, Fighter
 
 
 def populate_fighters_from_event(event_url):

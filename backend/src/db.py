@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 
 # Create DB engine (for dev, use SQLite file)
-DATABASE_URL = "sqlite:///../data/fighter_stats.db"
+DATABASE_URL = "sqlite:///./data/fighter_stats.db"
 
 engine = create_engine(DATABASE_URL, echo=False)
 SessionLocal = sessionmaker(bind=engine)

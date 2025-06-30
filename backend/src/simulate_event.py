@@ -2,7 +2,7 @@ import sys
 from ufc_scraper import get_fight_card
 from fight_model import calculate_exchange_probabilities
 from simulate_fight import simulate_fight
-from db import SessionLocal, Fighter
+from src.db import SessionLocal, Fighter
 
 
 def simulate_event(event_url):
