@@ -1,8 +1,8 @@
 const BASE_URL = 'http://localhost:8000'; // change if needed
 
 export async function getEvents() {
-  const res = await fetch(`${BASE_URL}/events`);
-  if (!res.ok) throw new Error('Failed to fetch events');
+  const res = await fetch("http://localhost:8000/events");
+  if (!res.ok) throw new Error("Failed to load events");
   return res.json();
 }
 

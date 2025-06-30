@@ -13,7 +13,12 @@ def get_upcoming_event_links():
     for row in soup.select("tr.b-statistics__table-row"):
         a_tag = row.find("a")
         if a_tag and "href" in a_tag.attrs:
-            event_links.append(a_tag["href"])
+            event_url = a_tag["href"]
+            event_title = a_tag.get_text(strip=True)
+            event_links.append({
+                "url": event_url,
+                "title": event_title
+            })
 
     return event_links
 
