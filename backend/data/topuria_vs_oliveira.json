@@ -1,22 +1,22 @@
 {
   "FighterA": {
-    "Name": "Topuria",
-    "SLpM": 4.69,
-    "StrAcc": 0.47,
-    "StrDef": 0.64,
-    "TDAvg": 2.02,
-    "TDAcc": 0.61,
-    "TDDef": 0.92,
-    "SubAvg": 1.1
+    "name": "Topuria",
+    "slpm": 4.69,
+    "str_acc": 0.47,
+    "str_def": 0.64,
+    "td_avg": 2.02,
+    "td_acc": 0.61,
+    "td_def": 0.92,
+    "sub_avg": 1.1
   },
   "FighterB": {
-    "Name": "Oliveira",
-    "SLpM": 3.40,
-    "StrAcc": 0.55,
-    "StrDef": 0.49,
-    "TDAvg": 2.25,
-    "TDAcc": 0.4,
-    "TDDef": 0.56,
-    "SubAvg": 2.7
+    "name": "Oliveira",
+    "slpm": 3.40,
+    "str_acc": 0.55,
+    "str_def": 0.49,
+    "td_avg": 2.25,
+    "td_acc": 0.4,
+    "td_def": 0.56,
+    "sub_avg": 2.7
   }
 }
