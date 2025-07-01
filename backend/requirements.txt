@@ -8,3 +8,4 @@ beautifulsoup4
 python-multipart
 numpy
 python-dotenv
+psycopg2-binary
