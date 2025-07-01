@@ -17,3 +17,7 @@ export default function App() {
     </Layout>
   );
 }
+
+
+// This is a dummy comment to trigger a rebuild
+// It can be removed later
