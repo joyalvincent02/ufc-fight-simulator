@@ -1,6 +1,7 @@
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { simulateEvent } from "../services/api";
+import Spinner from "../components/Spinner";
 
 type Fighter = {
   name: string;
@@ -42,7 +43,7 @@ export default function SimulatePage() {
       .finally(() => setLoading(false));
   }, [eventId]);
 
-  if (loading) return <div className="p-6 text-lg">Simulating full event...</div>;
+  if (loading) return <Spinner />;
   if (error) return <div className="p-6 text-red-600">Error: {error}</div>;
   if (!data) return null;
 
