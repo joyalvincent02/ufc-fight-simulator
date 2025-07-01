@@ -1,13 +1,17 @@
+import os
 from sqlalchemy import create_engine, Column, String, Float, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 
 # Create DB engine (for dev, use SQLite file)
-DATABASE_URL = "sqlite:///./data/fighter_stats.db"
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/fighter_stats.db")
 
-engine = create_engine(DATABASE_URL, echo=False)
-SessionLocal = sessionmaker(bind=engine)
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
