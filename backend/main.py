@@ -213,3 +213,7 @@ def refresh_fighter_images():
         "skipped": skipped,
         "total": len(fighters)
     }
+
+@app.get("/")
+def read_root():
+    return {"message": "Hello from FastAPI!"}
