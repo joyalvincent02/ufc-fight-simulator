@@ -13,15 +13,20 @@ import re
 
 import json
 import os
+from dotenv import load_dotenv
+load_dotenv()
+
 
 def to_stats_obj(d):
     return SimpleNamespace(**d)
 
 app = FastAPI()
 
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
