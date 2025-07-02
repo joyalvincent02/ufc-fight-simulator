@@ -115,7 +115,7 @@ export default function CustomSimPage() {
 
         <div className="text-center">
           <p className="text-sm text-gray-400 text-center mb-4">
-            ⚠️ Not all fighters are available yet — but the database is continuosly being updated.
+            ⚠️ Not all fighters are available yet — but the database is continuously being updated.
           </p>
           <button
             onClick={handleSimulate}
