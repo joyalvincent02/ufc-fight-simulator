@@ -16,13 +16,13 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-
 def to_stats_obj(d):
     return SimpleNamespace(**d)
 
 app = FastAPI()
 
 allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+print("🔧 ALLOWED_ORIGINS =", allowed_origins)
 
 app.add_middleware(
     CORSMiddleware,

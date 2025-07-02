@@ -1,14 +1,29 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { getEvents } from "../services/api";
 import MMA_Math from "../assets/mma_math.svg";
+import { getEvents, simulateEvent } from "../services/api";
 
 export default function HomePage() {
   const [nextEvent, setNextEvent] = useState<any>(null);
+  const [mainEvent, setMainEvent] = useState<null | {
+    name: string;
+    fighters: { name: string; image?: string }[];
+  }>(null);
 
   useEffect(() => {
     getEvents().then((events) => {
-      if (events.length > 0) setNextEvent(events[0]);
+      if (events.length === 0) return;
+      const first = events[0];
+      setNextEvent(first);
+
+      simulateEvent(first.id).then((data) => {
+        if (data.fights && data.fights.length > 0) {
+          setMainEvent({
+            name: data.event,
+            fighters: data.fights[0].fighters,
+          });
+        }
+      });
     });
   }, []);
 
@@ -21,7 +36,7 @@ export default function HomePage() {
       <main className="relative z-10 max-w-6xl mx-auto px-6">
         {/* Hero */}
         <section className="flex flex-col items-center text-center pt-28 pb-20">
-            <img src={MMA_Math} alt="MMA Math Logo" className="w-64 h-64 drop-shadow-lg"/>
+          <img src={MMA_Math} alt="MMA Math Logo" className="w-64 h-64 drop-shadow-lg" />
           <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight mb-6 leading-tight">
             MMA Math
           </h1>
@@ -44,18 +59,46 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Featured Event */}
-        {nextEvent && (
+        {/* Featured Event with Fighters */}
+        {mainEvent && (
           <section className="text-center py-12">
-            <div className="bg-white/5 border border-white/10 rounded-xl p-6 shadow-lg backdrop-blur-md max-w-md mx-auto">
-              <h2 className="text-xl font-bold mb-2 text-white">Next UFC Event</h2>
-              <p className="text-lg text-gray-300 mb-3">{nextEvent.title}</p>
-              <Link
-                to={`/simulate/${nextEvent.id}`}
-                className="text-red-400 font-medium hover:underline"
-              >
-                Simulate This Card →
-              </Link>
+            <div className="bg-white/5 border border-white/10 rounded-xl p-6 shadow-lg backdrop-blur-md max-w-xl mx-auto">
+              <h2 className="text-xl font-bold mb-4 text-white">{mainEvent.name}</h2>
+
+              <div className="flex justify-center items-center gap-6 mb-4">
+                {mainEvent.fighters.length >= 2 && (
+                  <>
+                    <div className="flex flex-col items-center">
+                      <img
+                        src={mainEvent.fighters[0].image || "https://www.ufc.com/themes/custom/ufc/assets/img/no-profile-image.png"}
+                        alt={mainEvent.fighters[0].name}
+                        className="w-24 h-24 rounded-full object-cover border"
+                      />
+                      <p className="text-white mt-2 text-sm font-semibold">{mainEvent.fighters[0].name}</p>
+                    </div>
+
+                    <span className="text-xl font-bold text-red-400">VS</span>
+
+                    <div className="flex flex-col items-center">
+                      <img
+                        src={mainEvent.fighters[1].image || "https://www.ufc.com/themes/custom/ufc/assets/img/no-profile-image.png"}
+                        alt={mainEvent.fighters[1].name}
+                        className="w-24 h-24 rounded-full object-cover border"
+                      />
+                      <p className="text-white mt-2 text-sm font-semibold">{mainEvent.fighters[1].name}</p>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {nextEvent && (
+                <Link
+                  to={`/simulate/${nextEvent.id}`}
+                  className="text-red-400 font-medium hover:underline"
+                >
+                  Simulate This Card →
+                </Link>
+              )}
             </div>
           </section>
         )}
