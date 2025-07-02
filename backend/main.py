@@ -69,6 +69,12 @@ def get_fighter_image_url(ufc_url: str):
         print(f"⚠️ Could not retrieve image from {ufc_url}: {e}")
         return None
 
+@app.get("/fighters")
+def list_fighters():
+    db = SessionLocal()
+    fighters = db.query(Fighter).order_by(Fighter.name).all()
+    db.close()
+    return [{"name": f.name, "image": f.image_url} for f in fighters]
 
 # Simulate endpoint
 @app.get("/simulate/{event_id}")
@@ -236,27 +242,12 @@ def simulate_custom_fight(req: CustomSimRequest):
     name_b = req.fighter_b.strip()
 
     fighter_a = db.query(Fighter).filter(Fighter.name == name_a).first()
-    if not fighter_a:
-        stats = scrape_fighter_stats(name_a)
-        if stats:
-            stats["image_url"] = get_fighter_image_url(f"https://www.ufc.com/athlete/{name_a.lower().replace(' ', '-')}")
-            save_fighter_to_db(stats)
-            fighter_a = db.query(Fighter).filter(Fighter.name == name_a).first()
-
     fighter_b = db.query(Fighter).filter(Fighter.name == name_b).first()
-    if not fighter_b:
-        stats = scrape_fighter_stats(name_b)
-        if stats:
-            stats["image_url"] = get_fighter_image_url(f"https://www.ufc.com/athlete/{name_b.lower().replace(' ', '-')}")
-            save_fighter_to_db(stats)
-            fighter_b = db.query(Fighter).filter(Fighter.name == name_b).first()
-
     db.close()
 
     if fighter_a and fighter_b:
         P_A, P_B, P_neutral = calculate_exchange_probabilities(fighter_a, fighter_b)
         results = simulate_fight(P_A, P_B, P_neutral, 5, name_A=name_a, name_B=name_b)
-
         return {
             "fighters": [
                 {"name": name_a, "image": fighter_a.image_url},
@@ -266,4 +257,4 @@ def simulate_custom_fight(req: CustomSimRequest):
             "results": results
         }
 
-    return {"error": "One or both fighters not found or missing data."}
+    return {"error": "One or both fighters not found in the database."}

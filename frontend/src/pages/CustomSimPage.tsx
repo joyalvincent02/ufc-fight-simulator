@@ -2,6 +2,9 @@ import { useState } from "react";
 import { simulateCustomFight } from "../services/api";
 import Spinner from "../components/Spinner";
 
+const FALLBACK_IMAGE =
+  "https://www.ufc.com/themes/custom/ufc/assets/img/no-profile-image.png";
+
 export default function CustomSimPage() {
   const [fighterA, setFighterA] = useState("");
   const [fighterB, setFighterB] = useState("");
@@ -26,78 +29,83 @@ export default function CustomSimPage() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white font-sans px-6 py-12">
-      <div className="max-w-3xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8 text-center">Custom Simulation</h1>
+    <div className="min-h-screen bg-black text-white py-12 px-4 sm:px-6 lg:px-8 font-sans relative overflow-hidden">
+      {/* Soft glow effect */}
+      <div className="absolute -top-20 -left-32 w-[500px] h-[500px] bg-red-700 opacity-20 rounded-full blur-[160px] z-0" />
+      <div className="absolute bottom-[-80px] right-[-60px] w-[300px] h-[300px] bg-red-500 opacity-10 rounded-full blur-[100px] z-0" />
+
+      <div className="relative z-10 max-w-4xl mx-auto">
+        <h1 className="text-4xl font-bold mb-10 text-center">Custom Simulation</h1>
 
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <input
             value={fighterA}
             onChange={(e) => setFighterA(e.target.value)}
             placeholder="Fighter A (e.g., Max Holloway)"
-            className="flex-1 px-4 py-2 rounded bg-gray-800 text-white"
+            className="flex-1 px-4 py-3 rounded-lg border border-gray-700 bg-gray-900 text-white focus:outline-none focus:ring-2 focus:ring-red-500"
           />
           <input
             value={fighterB}
             onChange={(e) => setFighterB(e.target.value)}
             placeholder="Fighter B (e.g., Dustin Poirier)"
-            className="flex-1 px-4 py-2 rounded bg-gray-800 text-white"
+            className="flex-1 px-4 py-3 rounded-lg border border-gray-700 bg-gray-900 text-white focus:outline-none focus:ring-2 focus:ring-red-500"
           />
         </div>
 
-        <button
-          onClick={handleSimulate}
-          disabled={loading}
-          className="bg-red-600 hover:bg-red-700 px-6 py-3 rounded font-semibold shadow disabled:opacity-50"
-        >
-          {loading ? "Simulating..." : "Simulate Fight"}
-        </button>
+        <div className="text-center">
+          <button
+            onClick={handleSimulate}
+            disabled={loading}
+            className="bg-red-600 hover:bg-red-700 px-8 py-3 rounded-lg font-semibold shadow text-white disabled:opacity-50 transition"
+          >
+            {loading ? "Simulating..." : "Simulate Fight"}
+          </button>
+        </div>
 
         {error && (
-          <p className="mt-4 text-red-400 text-sm font-medium">{error}</p>
+          <p className="mt-4 text-red-500 text-center text-sm font-medium">{error}</p>
         )}
 
         {loading && (
-          <div className="flex justify-center mt-8">
+          <div className="flex justify-center mt-10">
             <Spinner />
           </div>
         )}
 
         {result && (
-          <div className="mt-10 bg-white/5 p-6 rounded-lg border border-white/10 backdrop-blur">
-            <h2 className="text-xl font-semibold mb-4 text-center">
+          <div className="mt-10 bg-white/5 border border-white/10 backdrop-blur-md rounded-xl p-6 shadow-lg text-white">
+            <h2 className="text-2xl font-semibold text-center mb-6">
               {result.fighters[0].name} vs {result.fighters[1].name}
             </h2>
 
-            <div className="flex justify-center items-center gap-8 mb-6">
-              {result.fighters.map((f: any, i: number) => (
-                <div key={i} className="flex flex-col items-center">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {result.fighters.map((f: any, idx: number) => (
+                <div key={idx} className="flex flex-col items-center text-center">
                   <img
-                    src={
-                      f.image ||
-                      "https://www.ufc.com/themes/custom/ufc/assets/img/no-profile-image.png"
-                    }
+                    src={f.image || FALLBACK_IMAGE}
                     alt={f.name}
-                    className="w-24 h-24 rounded-full border object-cover"
+                    className="w-24 h-24 rounded-full object-cover border-2 border-white mb-3"
                   />
-                  <p className="mt-2 font-medium text-sm">{f.name}</p>
+                  <p className="text-lg font-bold">{f.name}</p>
+                  <p className="text-sm text-gray-300">
+                    Win %: {result.results[f.name]?.toFixed(1)}%
+                  </p>
+                  <p className="text-sm text-gray-400">
+                    Exchange Chance:{" "}
+                    {(
+                      (idx === 0
+                        ? result.probabilities.P_A
+                        : result.probabilities.P_B) * 100
+                    ).toFixed(2)}
+                    %
+                  </p>
                 </div>
               ))}
             </div>
 
-            <div className="text-center text-sm text-gray-300 space-y-1">
-              <p>
-                <strong>{result.fighters[0].name} Win %:</strong>{" "}
-                {(result.probabilities.P_A * 100).toFixed(1)}%
-              </p>
-              <p>
-                <strong>{result.fighters[1].name} Win %:</strong>{" "}
-                {(result.probabilities.P_B * 100).toFixed(1)}%
-              </p>
-              <p>
-                <strong>Neutral Exchange Chance:</strong>{" "}
-                {(result.probabilities.P_neutral * 100).toFixed(1)}%
-              </p>
+            <div className="mt-6 text-center text-sm text-gray-300">
+              Neutral Exchanges: {(result.probabilities.P_neutral * 100).toFixed(2)}% &nbsp;|&nbsp;
+              Draws: {result.results["Draw"]?.toFixed(1) || "0.0"}%
             </div>
           </div>
         )}
