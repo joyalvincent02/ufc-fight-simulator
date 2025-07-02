@@ -31,12 +31,12 @@ def get_fight_card(event_url: str):
     fights = []
 
     for row in fight_rows:
-        fighters = row.select("td.b-fight-details__table-col.l-page_align_left a.b-link")
-        if len(fighters) >= 2:
-            fighter_a = fighters[0].get_text(strip=True)
-            url_a = fighters[0]['href']
-            fighter_b = fighters[1].get_text(strip=True)
-            url_b = fighters[1]['href']
+        fighter_links = row.select("td.l-page_align_left a.b-link")
+        if len(fighter_links) >= 2:
+            fighter_a = fighter_links[0].get_text(strip=True)
+            url_a = fighter_links[0]["href"]
+            fighter_b = fighter_links[1].get_text(strip=True)
+            url_b = fighter_links[1]["href"]
 
             fights.append({
                 "fighter_a": fighter_a,
@@ -46,3 +46,4 @@ def get_fight_card(event_url: str):
             })
 
     return fights
+

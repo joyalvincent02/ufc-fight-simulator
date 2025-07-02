@@ -34,40 +34,49 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def get_fighter_image_url(ufc_url: str):
+def name_to_slug(name: str) -> str:
+    return name.lower().replace(" ", "-")
+
+def get_fighter_image_url(name: str) -> str | None:
+    slug = name_to_slug(name)
+    url = f"https://www.ufc.com/athlete/{slug}"
+
+    print(f"🌐 Fetching UFC profile: {url}")
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/122.0.0.0 Safari/537.36"
+        )
+    }
+
     try:
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/122.0.0.0 Safari/537.36"
-            )
-        }
-        response = requests.get(ufc_url, headers=headers)
-        if response.status_code != 200:
-            print(f"❌ Error fetching {ufc_url}: Status {response.status_code}")
+        res = requests.get(url, headers=headers, timeout=10)
+        print(f"📡 Response status: {res.status_code}")
+        if res.status_code != 200:
             return None
 
-        soup = BeautifulSoup(response.text, 'html.parser')
+        soup = BeautifulSoup(res.text, "html.parser")
 
         # Try og:image first
         meta_tag = soup.find("meta", property="og:image")
         if meta_tag and meta_tag.get("content"):
-            print(f"✅ Found image via og:image: {meta_tag['content']}")
+            print(f"✅ og:image found: {meta_tag['content']}")
             return meta_tag["content"]
 
-        # Fallback to image in header (new format)
-        img_tag = soup.select_one("div.c-hero__image img")
-        if img_tag and img_tag.get("src"):
-            print(f"✅ Found image via fallback tag: {img_tag['src']}")
-            return img_tag["src"]
-
-        print(f"⚠️ No image found in {ufc_url}")
-        return None
+        # Try fallback with image src match
+        img_tag = soup.find("img", {"src": re.compile(r"/images/styles/event_results_athlete_headshot")})
+        if img_tag:
+            src = img_tag["src"]
+            print(f"✅ fallback image found: {src}")
+            return "https://ufc.com" + src if src.startswith("/") else src
 
     except Exception as e:
-        print(f"⚠️ Could not retrieve image from {ufc_url}: {e}")
-        return None
+        print(f"❌ Exception while scraping image: {e}")
+
+    print("⚠️ No image found.")
+    return None
+
 
 @app.get("/fighters")
 def list_fighters():
@@ -123,13 +132,13 @@ def list_upcoming_events():
     
 @app.get("/simulate-event/{event_id}")
 def simulate_full_event(event_id: str):
-    upcoming = get_upcoming_event_links()
-    event = next((e for e in upcoming if e["url"].split("/")[-1] == event_id), None)
+    event_url = f"http://ufcstats.com/event-details/{event_id}"
+    print(f"🔍 Scraping card from: {event_url}")
 
-    if not event:
-        return {"error": f"Event ID {event_id} not found in upcoming events"}
+    card = get_fight_card(event_url)
+    if not card:
+        return {"error": f"No fight card found at {event_url}"}
 
-    card = get_fight_card(event["url"])
     db = SessionLocal()
     fight_results = []
 
@@ -144,35 +153,24 @@ def simulate_full_event(event_id: str):
         if not fighter_a:
             stats = scrape_fighter_stats(name_a, url_a)
             if stats:
-                ufc_com_url = f"https://www.ufc.com/athlete/{name_a.lower().replace(' ', '-')}"
-                image_url = get_fighter_image_url(ufc_com_url)
+                image_url = get_fighter_image_url(name_a)
                 if image_url:
                     stats["image_url"] = image_url
                 save_fighter_to_db(stats)
                 fighter_a = db.query(Fighter).filter(Fighter.name == name_a).first()
-        elif not fighter_a.image_url:
-            # Update image_url if missing
-            image_url = get_fighter_image_url(url_a)
-            if image_url:
-                fighter_a.image_url = image_url
-                db.commit()
+
 
         # Fetch or scrape Fighter B
         fighter_b = db.query(Fighter).filter(Fighter.name == name_b).first()
         if not fighter_b:
             stats = scrape_fighter_stats(name_b, url_b)
             if stats:
-                ufc_com_url = f"https://www.ufc.com/athlete/{name_b.lower().replace(' ', '-')}"
-                image_url = get_fighter_image_url(ufc_com_url)
+                image_url = get_fighter_image_url(name_b)
                 if image_url:
                     stats["image_url"] = image_url
                 save_fighter_to_db(stats)
                 fighter_b = db.query(Fighter).filter(Fighter.name == name_b).first()
-        elif not fighter_b.image_url:
-            image_url = get_fighter_image_url(url_b)
-            if image_url:
-                fighter_b.image_url = image_url
-                db.commit()
+
 
         if fighter_a and fighter_b:
             P_A, P_B, P_neutral = calculate_exchange_probabilities(fighter_a, fighter_b)
@@ -195,9 +193,10 @@ def simulate_full_event(event_id: str):
     db.close()
 
     return {
-        "event": event["title"],
+        "event": f"Event ID {event_id}",
         "fights": fight_results
     }
+
 
 @app.post("/refresh-images")
 def refresh_fighter_images():
@@ -207,9 +206,7 @@ def refresh_fighter_images():
     skipped = 0
 
     for fighter in fighters:
-        ufc_com_url = f"https://www.ufc.com/athlete/{fighter.name.lower().replace(' ', '-')}"
-        image_url = get_fighter_image_url(ufc_com_url)
-
+        image_url = get_fighter_image_url(fighter.name)
         if image_url:
             if fighter.image_url != image_url:
                 fighter.image_url = image_url
