@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Request
 from src.fight_model import calculate_exchange_probabilities
 from src.simulate_fight import simulate_fight
 from src.ufc_scraper import get_upcoming_event_links
@@ -8,6 +9,7 @@ from src.fighter_scraper import scrape_fighter_stats, save_fighter_to_db
 from src.db import SessionLocal, Fighter
 from types import SimpleNamespace
 from bs4 import BeautifulSoup
+from pydantic import BaseModel
 import requests
 import re
 
@@ -222,3 +224,46 @@ def refresh_fighter_images():
 @app.get("/")
 def read_root():
     return {"message": "Hello from FastAPI!"}
+
+class CustomSimRequest(BaseModel):
+    fighter_a: str
+    fighter_b: str
+
+@app.post("/simulate-custom")
+def simulate_custom_fight(req: CustomSimRequest):
+    db = SessionLocal()
+    name_a = req.fighter_a.strip()
+    name_b = req.fighter_b.strip()
+
+    fighter_a = db.query(Fighter).filter(Fighter.name == name_a).first()
+    if not fighter_a:
+        stats = scrape_fighter_stats(name_a)
+        if stats:
+            stats["image_url"] = get_fighter_image_url(f"https://www.ufc.com/athlete/{name_a.lower().replace(' ', '-')}")
+            save_fighter_to_db(stats)
+            fighter_a = db.query(Fighter).filter(Fighter.name == name_a).first()
+
+    fighter_b = db.query(Fighter).filter(Fighter.name == name_b).first()
+    if not fighter_b:
+        stats = scrape_fighter_stats(name_b)
+        if stats:
+            stats["image_url"] = get_fighter_image_url(f"https://www.ufc.com/athlete/{name_b.lower().replace(' ', '-')}")
+            save_fighter_to_db(stats)
+            fighter_b = db.query(Fighter).filter(Fighter.name == name_b).first()
+
+    db.close()
+
+    if fighter_a and fighter_b:
+        P_A, P_B, P_neutral = calculate_exchange_probabilities(fighter_a, fighter_b)
+        results = simulate_fight(P_A, P_B, P_neutral, 5, name_A=name_a, name_B=name_b)
+
+        return {
+            "fighters": [
+                {"name": name_a, "image": fighter_a.image_url},
+                {"name": name_b, "image": fighter_b.image_url}
+            ],
+            "probabilities": {"P_A": P_A, "P_B": P_B, "P_neutral": P_neutral},
+            "results": results
+        }
+
+    return {"error": "One or both fighters not found or missing data."}
