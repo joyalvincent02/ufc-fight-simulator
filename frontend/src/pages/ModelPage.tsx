@@ -29,26 +29,31 @@ export default function ModelPage() {
           </ul>
 
           <p className="mt-2">These must add to 1:</p>
-          <BlockMath math="P_A + P_B + P_{\text{neutral}} = 1" />
-
+          <div className="overflow-x-auto">
+            <BlockMath math="P_A + P_B + P_{\text{neutral}} = 1" />
+          </div>
           <p>
             We assume a fixed <InlineMath math="P_{\text{neutral}} = 0.4" /> to account for randomness.
             The remaining 60% is split based on fighter effectiveness:
           </p>
-          <BlockMath math="P_A = 0.6 \cdot \frac{E_A}{E_A + E_B}, \quad P_B = 0.6 \cdot \frac{E_B}{E_A + E_B}" />
-
+          <div className="overflow-x-auto">
+            <BlockMath math="P_A = 0.6 \cdot \frac{E_A}{E_A + E_B}, \quad P_B = 0.6 \cdot \frac{E_B}{E_A + E_B}" />
+          </div>
           <h2 className="text-2xl font-bold mt-8 text-red-400">2. Striking Effectiveness</h2>
           <p>Based on significant strikes, accuracy, and opponent defense:</p>
-          <BlockMath math="S = \text{SLpM} \cdot \text{Str Acc} \cdot (1 + \text{Opp SD})" />
-
+          <div className="overflow-x-auto">
+            <BlockMath math="S = \text{SLpM} \cdot \text{Str Acc} \cdot (1 + \text{Opp SD})" />
+          </div>
           <h2 className="text-2xl font-bold mt-8 text-red-400">3. Grappling Effectiveness</h2>
           <p>Grappling considers takedowns and submissions:</p>
-          <BlockMath math="T = \text{TD Avg} \cdot \text{TD Acc} \cdot (1 + \text{Opp TDD})" />
-          <BlockMath math="G = 0.3 \cdot T + 0.2 \cdot \text{Sub Avg}" />
-
+          <div className="overflow-x-auto">
+            <BlockMath math="T = \text{TD Avg} \cdot \text{TD Acc} \cdot (1 + \text{Opp TDD})" />
+            <BlockMath math="G = 0.3 \cdot T + 0.2 \cdot \text{Sub Avg}" />
+          </div>
           <h2 className="text-2xl font-bold mt-8 text-red-400">4. Total Effectiveness</h2>
-          <BlockMath math="E = S + G" />
-
+          <div className="overflow-x-auto">
+            <BlockMath math="E = S + G" />
+          </div>
           <h2 className="text-2xl font-bold mt-8 text-red-400">5. Round and Fight Scoring</h2>
           <p>Each round consists of 10 exchanges. Scoring logic:</p>
           <ul className="list-disc ml-6">

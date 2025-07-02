@@ -131,7 +131,7 @@ export default function HomePage() {
               desc: "Built on custom logic and simulation math to predict outcomes fairly.",
             },
             {
-              title: "Beautiful & Fast",
+              title: "Fast & Responsive",
               desc: "Built with FastAPI, React, Tailwind CSS, and deployed via Azure with CI/CD.",
             },
           ].map((item, i) => (

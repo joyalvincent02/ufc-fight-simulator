@@ -3,6 +3,10 @@ import { useEffect, useState } from "react";
 import { simulateEvent } from "../services/api";
 import Spinner from "../components/Spinner";
 
+const winnerColor = "#015a3c";
+const loserColor = "#ca2320";
+const neutralColor = "#d65500";
+
 type Fighter = {
   name: string;
   image?: string;
@@ -61,6 +65,7 @@ export default function SimulatePage() {
             const [A, B] = fight.fighters;
             const { P_A, P_B, P_neutral } = fight.probabilities;
             const results = fight.results;
+            const drawPct = results["Draw"] || 0;
 
             return (
               <div
@@ -72,27 +77,42 @@ export default function SimulatePage() {
                 </h2>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  {[A, B].map((f, idx) => (
-                    <div key={idx} className="flex flex-col items-center text-center">
-                      <img
-                        src={f.image || FALLBACK_IMAGE}
-                        alt={f.name}
-                        className="w-24 h-24 rounded-full object-cover border-2 border-white mb-3"
-                      />
-                      <p className="text-lg font-bold">{f.name}</p>
-                      <p className="text-sm text-gray-300">
-                        Win %: {results[f.name]?.toFixed(1)}%
-                      </p>
-                      <p className="text-sm text-gray-400">
-                        Exchange Chance: {((idx === 0 ? P_A : P_B) * 100).toFixed(2)}%
-                      </p>
-                    </div>
-                  ))}
+                  {[A, B].map((f, idx) => {
+                    const winPct = results[f.name] || 0;
+                    const otherWinPct = results[[A, B][1 - idx].name] || 0;
+
+                    let borderColor = "border-white";
+                    if (drawPct >= 45) {
+                      borderColor = neutralColor;
+                    } else if (winPct > otherWinPct) {
+                      borderColor = winnerColor;
+                    } else if (winPct < otherWinPct) {
+                      borderColor = loserColor;
+                    }
+
+                    return (
+                      <div key={idx} className="flex flex-col items-center text-center">
+                        <img
+                          src={f.image || FALLBACK_IMAGE}
+                          alt={f.name}
+                          style={{ borderColor }}
+                          className="w-24 h-24 rounded-full object-cover border-4 mb-3"
+                        />
+                        <p className="text-lg font-bold">{f.name}</p>
+                        <p className="text-sm text-gray-300">
+                          Win %: {results[f.name]?.toFixed(1)}%
+                        </p>
+                        <p className="text-sm text-gray-400">
+                          Exchange Chance: {((idx === 0 ? P_A : P_B) * 100).toFixed(2)}%
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div className="mt-6 text-center text-sm text-gray-300">
                   Neutral Exchanges: {(P_neutral * 100).toFixed(2)}% &nbsp;|&nbsp;
-                  Draws: {results["Draw"]?.toFixed(1) || "0.0"}%
+                  Draws: {drawPct.toFixed(1)}%
                 </div>
 
                 {fight.error && (

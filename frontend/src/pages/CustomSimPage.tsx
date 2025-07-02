@@ -5,6 +5,10 @@ import Spinner from "../components/Spinner";
 const FALLBACK_IMAGE =
   "https://www.ufc.com/themes/custom/ufc/assets/img/no-profile-image.png";
 
+const winnerColor = "#015a3c";
+const loserColor = "#ca2320";
+const neutralColor = "#d65500";
+
 type Fighter = { name: string; image?: string };
 
 export default function CustomSimPage() {
@@ -115,7 +119,7 @@ export default function CustomSimPage() {
 
         <div className="text-center">
           <p className="text-sm text-gray-400 text-center mb-4">
-            ⚠️ Not all fighters are available yet — but the database is continuously being updated.
+            ⚠️ Not all fighters are available yet but the database is continuously being updated.
           </p>
           <button
             onClick={handleSimulate}
@@ -143,28 +147,44 @@ export default function CustomSimPage() {
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {result.fighters.map((f: any, idx: number) => (
-                <div key={idx} className="flex flex-col items-center text-center">
-                  <img
-                    src={f.image || FALLBACK_IMAGE}
-                    alt={f.name}
-                    className="w-24 h-24 rounded-full object-cover border-2 border-white mb-3"
-                  />
-                  <p className="text-lg font-bold">{f.name}</p>
-                  <p className="text-sm text-gray-300">
-                    Win %: {result.results[f.name]?.toFixed(1)}%
-                  </p>
-                  <p className="text-sm text-gray-400">
-                    Exchange Chance:{" "}
-                    {(
-                      (idx === 0
-                        ? result.probabilities.P_A
-                        : result.probabilities.P_B) * 100
-                    ).toFixed(2)}
-                    %
-                  </p>
-                </div>
-              ))}
+              {result.fighters.map((f: any, idx: number) => {
+                const winPct = result.results[f.name] || 0;
+                const otherWinPct = result.results[result.fighters[1 - idx].name] || 0;
+                const drawPct = result.results["Draw"] || 0;
+
+                let borderColor = "#ffffff"; // default
+                if (drawPct >= 45) {
+                  borderColor = neutralColor;
+                } else if (winPct > otherWinPct) {
+                  borderColor = winnerColor;
+                } else if (winPct < otherWinPct) {
+                  borderColor = loserColor;
+                }
+
+                return (
+                  <div key={idx} className="flex flex-col items-center text-center">
+                    <img
+                      src={f.image || FALLBACK_IMAGE}
+                      alt={f.name}
+                      style={{ borderColor }}
+                      className="w-24 h-24 rounded-full object-cover border-4 mb-3"
+                    />
+                    <p className="text-lg font-bold">{f.name}</p>
+                    <p className="text-sm text-gray-300">
+                      Win %: {winPct.toFixed(1)}%
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      Exchange Chance:{" "}
+                      {(
+                        (idx === 0
+                          ? result.probabilities.P_A
+                          : result.probabilities.P_B) * 100
+                      ).toFixed(2)}
+                      %
+                    </p>
+                  </div>
+                );
+              })}
             </div>
 
             <div className="mt-6 text-center text-sm text-gray-300">
