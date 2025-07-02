@@ -48,58 +48,62 @@ export default function SimulatePage() {
   if (!data) return null;
 
   return (
-    <div className="max-w-4xl mx-auto p-4 md:p-6">
-      <h1 className="text-2xl md:text-3xl font-bold mb-6 text-center">
-        Simulated Card: {data.event}
-      </h1>
+    <div className="min-h-screen bg-black text-white py-12 px-4 sm:px-6 lg:px-8 font-sans relative overflow-hidden">
+      {/* Soft glow accents */}
+      <div className="absolute -top-20 -left-32 w-[500px] h-[500px] bg-red-700 opacity-20 rounded-full blur-[160px] z-0" />
+      <div className="absolute bottom-[-80px] right-[-60px] w-[300px] h-[300px] bg-red-500 opacity-10 rounded-full blur-[100px] z-0" />
 
-      <div className="space-y-6">
-        {data.fights.map((fight, i) => {
-          const [A, B] = fight.fighters;
-          const { P_A, P_B, P_neutral } = fight.probabilities;
-          const results = fight.results;
+      <div className="relative z-10 max-w-4xl mx-auto">
+        <h1 className="text-4xl font-bold mb-10 text-center">Simulated Card: {data.event}</h1>
 
-          return (
-            <div
-              key={i}
-              className="bg-white rounded-2xl shadow p-4 md:p-6 border border-gray-200"
-            >
-              <h2 className="text-xl font-semibold text-center mb-4">
-                {A.name} vs {B.name}
-              </h2>
+        <div className="space-y-8">
+          {data.fights.map((fight, i) => {
+            const [A, B] = fight.fighters;
+            const { P_A, P_B, P_neutral } = fight.probabilities;
+            const results = fight.results;
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {[A, B].map((f, idx) => (
-                  <div key={idx} className="flex flex-col items-center text-center">
-                    <img
-                      src={f.image || FALLBACK_IMAGE}
-                      alt={f.name}
-                      className="w-24 h-24 rounded-full object-cover border mb-2"
-                    />
-                    <p className="text-lg font-bold">{f.name}</p>
-                    <p className="text-sm text-gray-600">
-                      Win %: {results[f.name]?.toFixed(1)}%
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Exchange Chance: {((idx === 0 ? P_A : P_B) * 100).toFixed(2)}%
-                    </p>
-                  </div>
-                ))}
-              </div>
+            return (
+              <div
+                key={i}
+                className="bg-white/5 border border-white/10 backdrop-blur-md rounded-xl p-6 shadow-lg"
+              >
+                <h2 className="text-2xl font-semibold text-center mb-6">
+                  {A.name} vs {B.name}
+                </h2>
 
-              <div className="mt-4 text-center text-sm text-gray-600">
-                Neutral Exchanges: {(P_neutral * 100).toFixed(2)}% | Draws:{" "}
-                {results["Draw"]?.toFixed(1)}%
-              </div>
-
-              {fight.error && (
-                <div className="mt-2 text-center text-red-500">
-                  ⚠️ {fight.error}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  {[A, B].map((f, idx) => (
+                    <div key={idx} className="flex flex-col items-center text-center">
+                      <img
+                        src={f.image || FALLBACK_IMAGE}
+                        alt={f.name}
+                        className="w-24 h-24 rounded-full object-cover border-2 border-white mb-3"
+                      />
+                      <p className="text-lg font-bold">{f.name}</p>
+                      <p className="text-sm text-gray-300">
+                        Win %: {results[f.name]?.toFixed(1)}%
+                      </p>
+                      <p className="text-sm text-gray-400">
+                        Exchange Chance: {((idx === 0 ? P_A : P_B) * 100).toFixed(2)}%
+                      </p>
+                    </div>
+                  ))}
                 </div>
-              )}
-            </div>
-          );
-        })}
+
+                <div className="mt-6 text-center text-sm text-gray-300">
+                  Neutral Exchanges: {(P_neutral * 100).toFixed(2)}% &nbsp;|&nbsp;
+                  Draws: {results["Draw"]?.toFixed(1) || "0.0"}%
+                </div>
+
+                {fight.error && (
+                  <div className="mt-4 text-center text-red-500 font-medium">
+                    ⚠️ {fight.error}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
