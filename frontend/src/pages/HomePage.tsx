@@ -41,7 +41,7 @@ export default function HomePage() {
             MMA Math
           </h1>
           <p className="text-lg sm:text-xl text-gray-300 max-w-2xl mb-8">
-            Simulate UFC fights using real fighter stats and machine-learned logic. Built for fans, analysts, and anyone curious about what *might happen*.
+            Simulate UFC fights using real fighter stats and machine-learned logic. Built for fans, analysts and anyone curious about what *might happen* 🤞
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <Link
@@ -63,6 +63,7 @@ export default function HomePage() {
         {mainEvent && (
           <section className="text-center py-12">
             <div className="bg-white/5 border border-white/10 rounded-xl p-6 shadow-lg backdrop-blur-md max-w-xl mx-auto">
+              <h2 className="text-2xl font-bold mb-4 text-red-400">Next Event</h2>
               <h2 className="text-xl font-bold mb-4 text-white">{mainEvent.name}</h2>
 
               <div className="flex justify-center items-center gap-6 mb-4">

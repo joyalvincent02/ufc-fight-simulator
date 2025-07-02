@@ -1,9 +1,11 @@
 import { Routes, Route } from "react-router-dom";
+import 'katex/dist/katex.min.css';
 import Layout from "./layouts/Layout";
 import HomePage from "./pages/HomePage";
 import EventsPage from "./pages/EventsPage";
 import SimulatePage from "./pages/SimulatePage";
 import CustomSimPage from "./pages/CustomSimPage";
+import ModelPage from "./pages/ModelPage";
 
 export default function App() {
   return (
@@ -13,11 +15,8 @@ export default function App() {
         <Route path="/events" element={<EventsPage />} />
         <Route path="/simulate/:eventId" element={<SimulatePage />} />
         <Route path="/custom" element={<CustomSimPage />} />
+        <Route path="/model" element={<ModelPage />} />
       </Routes>
     </Layout>
   );
 }
-
-
-// This is a dummy comment to trigger a rebuild
-// It can be removed later

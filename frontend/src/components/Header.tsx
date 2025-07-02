@@ -16,6 +16,9 @@ export default function Header() {
           <Link to="/custom" className="hover:underline">
             Custom
           </Link>
+          <Link to="/model" className="hover:underline">
+            Model
+          </Link>
         </nav>
       </div>
     </header>
