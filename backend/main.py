@@ -135,6 +135,16 @@ def simulate_full_event(event_id: str):
     event_url = f"http://ufcstats.com/event-details/{event_id}"
     print(f"🔍 Scraping card from: {event_url}")
 
+    # Get the event title
+    try:
+        response = requests.get(event_url)
+        soup = BeautifulSoup(response.text, "html.parser")
+        event_title_tag = soup.find("h2", class_="b-content__title")
+        event_title = event_title_tag.get_text(strip=True) if event_title_tag else f"Event ID {event_id}"
+    except Exception as e:
+        print(f"⚠️ Failed to fetch event title: {e}")
+        event_title = f"Event ID {event_id}"
+
     card = get_fight_card(event_url)
     if not card:
         return {"error": f"No fight card found at {event_url}"}
@@ -193,8 +203,8 @@ def simulate_full_event(event_id: str):
     db.close()
 
     return {
-        "event": f"Event ID {event_id}",
-        "fights": fight_results
+    "event": event_title,
+    "fights": fight_results
     }
 
 
