@@ -71,3 +71,6 @@ gunicorn
 sqlalchemy
 aiohttp
 beautifulsoup4
+pytest
+httpx
+anyio
