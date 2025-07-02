@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import MMA_Math from "../assets/mma_math.svg";
 import { getEvents, simulateEvent } from "../services/api";
-import Spinner from "../components/Spinner";
 
 export default function HomePage() {
   const [nextEvent, setNextEvent] = useState<any>(null);
