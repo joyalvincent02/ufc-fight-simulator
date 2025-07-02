@@ -1,16 +1,43 @@
-import { useState } from "react";
-import { simulateCustomFight } from "../services/api";
+import { useEffect, useState } from "react";
+import { simulateCustomFight, getFighters } from "../services/api";
 import Spinner from "../components/Spinner";
 
 const FALLBACK_IMAGE =
   "https://www.ufc.com/themes/custom/ufc/assets/img/no-profile-image.png";
 
+type Fighter = { name: string; image?: string };
+
 export default function CustomSimPage() {
   const [fighterA, setFighterA] = useState("");
   const [fighterB, setFighterB] = useState("");
+  const [suggestions, setSuggestions] = useState<Fighter[]>([]);
+  const [fighters, setFighters] = useState<Fighter[]>([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState("");
+  const [activeField, setActiveField] = useState<"A" | "B" | null>(null);
+
+  useEffect(() => {
+    getFighters().then(setFighters).catch(console.error);
+  }, []);
+
+  const handleInputChange = (value: string, which: "A" | "B") => {
+    if (which === "A") setFighterA(value);
+    else setFighterB(value);
+
+    setActiveField(which);
+    const filtered = fighters.filter(f =>
+      f.name.toLowerCase().includes(value.toLowerCase())
+    );
+    setSuggestions(filtered.slice(0, 5));
+  };
+
+  const handleSelectSuggestion = (name: string) => {
+    if (activeField === "A") setFighterA(name);
+    else setFighterB(name);
+    setSuggestions([]);
+    setActiveField(null);
+  };
 
   const handleSimulate = async () => {
     setLoading(true);
@@ -30,29 +57,66 @@ export default function CustomSimPage() {
 
   return (
     <div className="min-h-screen bg-black text-white py-12 px-4 sm:px-6 lg:px-8 font-sans relative overflow-hidden">
-      {/* Soft glow effect */}
       <div className="absolute -top-20 -left-32 w-[500px] h-[500px] bg-red-700 opacity-20 rounded-full blur-[160px] z-0" />
       <div className="absolute bottom-[-80px] right-[-60px] w-[300px] h-[300px] bg-red-500 opacity-10 rounded-full blur-[100px] z-0" />
 
       <div className="relative z-10 max-w-4xl mx-auto">
         <h1 className="text-4xl font-bold mb-10 text-center">Custom Simulation</h1>
 
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <input
-            value={fighterA}
-            onChange={(e) => setFighterA(e.target.value)}
-            placeholder="Fighter A (e.g., Max Holloway)"
-            className="flex-1 px-4 py-3 rounded-lg border border-gray-700 bg-gray-900 text-white focus:outline-none focus:ring-2 focus:ring-red-500"
-          />
-          <input
-            value={fighterB}
-            onChange={(e) => setFighterB(e.target.value)}
-            placeholder="Fighter B (e.g., Dustin Poirier)"
-            className="flex-1 px-4 py-3 rounded-lg border border-gray-700 bg-gray-900 text-white focus:outline-none focus:ring-2 focus:ring-red-500"
-          />
+        <div className="flex flex-col sm:flex-row gap-4 mb-6 relative">
+          {/* Fighter A Input */}
+          <div className="flex-1 relative">
+            <input
+              value={fighterA}
+              onChange={(e) => handleInputChange(e.target.value, "A")}
+              onFocus={() => setActiveField("A")}
+              placeholder="Fighter A (e.g., Max Holloway)"
+              className="w-full px-4 py-3 rounded-lg border border-gray-700 bg-gray-900 text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
+            {activeField === "A" && suggestions.length > 0 && (
+              <ul className="absolute bg-gray-800 border border-gray-700 rounded-lg mt-1 w-full max-h-48 overflow-auto z-20">
+                {suggestions.map((f, idx) => (
+                  <li
+                    key={idx}
+                    onClick={() => handleSelectSuggestion(f.name)}
+                    className="px-4 py-2 hover:bg-red-600 cursor-pointer text-sm"
+                  >
+                    {f.name}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Fighter B Input */}
+          <div className="flex-1 relative">
+            <input
+              value={fighterB}
+              onChange={(e) => handleInputChange(e.target.value, "B")}
+              onFocus={() => setActiveField("B")}
+              placeholder="Fighter B (e.g., Dustin Poirier)"
+              className="w-full px-4 py-3 rounded-lg border border-gray-700 bg-gray-900 text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
+            {activeField === "B" && suggestions.length > 0 && (
+              <ul className="absolute bg-gray-800 border border-gray-700 rounded-lg mt-1 w-full max-h-48 overflow-auto z-20">
+                {suggestions.map((f, idx) => (
+                  <li
+                    key={idx}
+                    onClick={() => handleSelectSuggestion(f.name)}
+                    className="px-4 py-2 hover:bg-red-600 cursor-pointer text-sm"
+                  >
+                    {f.name}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
 
         <div className="text-center">
+          <p className="text-sm text-gray-400 text-center mb-4">
+            ⚠️ Not all fighters are available yet — but the database is continuosly being updated.
+          </p>
           <button
             onClick={handleSimulate}
             disabled={loading}

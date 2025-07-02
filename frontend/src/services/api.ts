@@ -26,5 +26,5 @@ export async function simulateCustomFight(fighterA: string, fighterB: string) {
 export async function getFighters(): Promise<{ name: string; image?: string }[]> {
   const res = await fetch(`${BASE_URL}/fighters`);
   if (!res.ok) throw new Error("Failed to load fighter list");
-  return res.json();
+  return await res.json();
 }
