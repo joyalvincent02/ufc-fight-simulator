@@ -223,7 +223,17 @@ def simulate_custom_fight(req: CustomSimRequest):
                 "results": results
             }
         else:
-            return get_ensemble_prediction(name_a, name_b, model)
+            ensemble_result = get_ensemble_prediction(name_a, name_b, model)
+            # Normalize the response format to match simulation format
+            return {
+                "fighters": [{"name": name_a, "image": f1.image_url}, {"name": name_b, "image": f2.image_url}],
+                "model": model,
+                "results": {
+                    name_a: ensemble_result["fighter_a_win_prob"],
+                    name_b: ensemble_result["fighter_b_win_prob"],
+                    "Draw": 100.0 - ensemble_result["fighter_a_win_prob"] - ensemble_result["fighter_b_win_prob"]
+                }
+            }
     except Exception as e:
         return {"error": str(e)}
 

@@ -20,10 +20,18 @@ export default function CustomSimPage() {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState("");
   const [activeField, setActiveField] = useState<"A" | "B" | null>(null);
+  const [model, setModel] = useState("ensemble");
 
   useEffect(() => {
     getFighters().then(setFighters).catch(console.error);
   }, []);
+
+  // Re-run simulation when model changes (if we have both fighters selected and a previous result)
+  useEffect(() => {
+    if (fighterA && fighterB && result) {
+      handleSimulate();
+    }
+  }, [model]);
 
   const handleInputChange = (value: string, which: "A" | "B") => {
     if (which === "A") setFighterA(value);
@@ -49,10 +57,12 @@ export default function CustomSimPage() {
     setError("");
 
     try {
-      const data = await simulateCustomFight(fighterA, fighterB);
+      const data = await simulateCustomFight(fighterA, fighterB, model);
+      console.log("API Response:", data); // Debug log
       if (data.error) setError(data.error);
       else setResult(data);
     } catch (err) {
+      console.error("Error:", err); // Debug log
       setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
@@ -66,6 +76,31 @@ export default function CustomSimPage() {
 
       <div className="relative z-10 max-w-4xl mx-auto">
         <h1 className="text-4xl font-bold mb-10 text-center">Custom Simulation</h1>
+
+        {/* Dropdown for prediction model */}
+        <div className="flex justify-center mb-6">
+          <div className="flex items-center gap-4 bg-white/5 px-4 py-2 rounded-lg border border-white/10">
+            <label htmlFor="model" className="text-white font-medium whitespace-nowrap">
+              Prediction Model
+            </label>
+            <select
+              id="model"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              disabled={loading}
+              className="bg-gray-800 text-white px-3 py-1 rounded border border-gray-600 disabled:opacity-50"
+            >
+              <option value="ensemble">Ensemble</option>
+              <option value="ml">Machine Learning</option>
+              <option value="sim">Simulation</option>
+            </select>
+            {loading && result && (
+              <span className="text-yellow-400 text-sm ml-2">
+                ⟳ Updating...
+              </span>
+            )}
+          </div>
+        </div>
 
         <div className="flex flex-col sm:flex-row gap-4 mb-6 relative">
           {/* Fighter A Input */}
@@ -118,7 +153,7 @@ export default function CustomSimPage() {
         </div>
 
         <div className="text-center">
-          <p className="text-sm text-gray-400 text-center mb-4">
+          <p className="text-sm text-gray-400 mb-4">
             ⚠️ Not all fighters are available yet but the database is continuously being updated.
           </p>
           <button
@@ -143,16 +178,16 @@ export default function CustomSimPage() {
         {result && (
           <div className="mt-10 bg-white/5 border border-white/10 backdrop-blur-md rounded-xl p-6 shadow-lg text-white">
             <h2 className="text-2xl font-semibold text-center mb-6">
-              {result.fighters[0].name} vs {result.fighters[1].name}
+              {result.fighters?.[0]?.name || fighterA} vs {result.fighters?.[1]?.name || fighterB}
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {result.fighters.map((f: any, idx: number) => {
+              {result.fighters && result.fighters.length >= 2 ? result.fighters.map((f: any, idx: number) => {
                 const winPct = result.results[f.name] || 0;
                 const otherWinPct = result.results[result.fighters[1 - idx].name] || 0;
                 const drawPct = result.results["Draw"] || 0;
 
-                let borderColor = "#ffffff"; // default
+                let borderColor = "#ffffff";
                 if (drawPct >= 45) {
                   borderColor = neutralColor;
                 } else if (winPct > otherWinPct) {
@@ -170,27 +205,69 @@ export default function CustomSimPage() {
                       className="w-24 h-24 rounded-full object-cover border-4 mb-3"
                     />
                     <p className="text-lg font-bold">{f.name}</p>
-                    <p className="text-sm text-gray-300">
-                      Win %: {winPct.toFixed(1)}%
-                    </p>
-                    <p className="text-sm text-gray-400">
-                      Exchange Chance:{" "}
-                      {(
-                        (idx === 0
-                          ? result.probabilities.P_A
-                          : result.probabilities.P_B) * 100
-                      ).toFixed(2)}
-                      %
-                    </p>
+                    <p className="text-sm text-gray-300">Win %: {winPct.toFixed(1)}%</p>
+                    {result.probabilities && (
+                      <p className="text-sm text-gray-400">
+                        Exchange Chance:{" "}
+                        {(
+                          (idx === 0
+                            ? result.probabilities.P_A
+                            : result.probabilities.P_B) * 100
+                        ).toFixed(2)}
+                        %
+                      </p>
+                    )}
                   </div>
                 );
-              })}
+              }) : (
+                // Fallback for when fighters array is not available
+                [fighterA, fighterB].map((name, idx) => {
+                  const winPct = result.results?.[name] || 0;
+                  const otherWinPct = result.results?.[[fighterA, fighterB][1 - idx]] || 0;
+                  const drawPct = result.results?.["Draw"] || 0;
+
+                  let borderColor = "#ffffff";
+                  if (drawPct >= 45) {
+                    borderColor = neutralColor;
+                  } else if (winPct > otherWinPct) {
+                    borderColor = winnerColor;
+                  } else if (winPct < otherWinPct) {
+                    borderColor = loserColor;
+                  }
+
+                  return (
+                    <div key={idx} className="flex flex-col items-center text-center">
+                      <img
+                        src={FALLBACK_IMAGE}
+                        alt={name}
+                        style={{ borderColor }}
+                        className="w-24 h-24 rounded-full object-cover border-4 mb-3"
+                      />
+                      <p className="text-lg font-bold">{name}</p>
+                      <p className="text-sm text-gray-300">Win %: {winPct.toFixed(1)}%</p>
+                      {result.probabilities && (
+                        <p className="text-sm text-gray-400">
+                          Exchange Chance:{" "}
+                          {(
+                            (idx === 0
+                              ? result.probabilities.P_A
+                              : result.probabilities.P_B) * 100
+                          ).toFixed(2)}
+                          %
+                        </p>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
 
-            <div className="mt-6 text-center text-sm text-gray-300">
-              Neutral Exchanges: {(result.probabilities.P_neutral * 100).toFixed(2)}% &nbsp;|&nbsp;
-              Draws: {result.results["Draw"]?.toFixed(1) || "0.0"}%
-            </div>
+            {result.probabilities && (
+              <div className="mt-6 text-center text-sm text-gray-300">
+                Neutral Exchanges: {(result.probabilities.P_neutral * 100).toFixed(2)}% &nbsp;|&nbsp;
+                Draws: {result.results?.["Draw"]?.toFixed(1) || "0.0"}%
+              </div>
+            )}
           </div>
         )}
       </div>

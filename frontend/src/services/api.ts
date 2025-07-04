@@ -12,11 +12,11 @@ export async function simulateEvent(eventId: string, model: string = "ensemble")
 }
 
 
-export async function simulateCustomFight(fighterA: string, fighterB: string) {
+export async function simulateCustomFight(fighterA: string, fighterB: string, model: string = "ensemble") {
   const res = await fetch(`${BASE_URL}/simulate-custom`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ fighter_a: fighterA, fighter_b: fighterB }),
+    body: JSON.stringify({ fighter_a: fighterA, fighter_b: fighterB, model }),
   });
 
   if (!res.ok) throw new Error("Failed to simulate custom fight");
