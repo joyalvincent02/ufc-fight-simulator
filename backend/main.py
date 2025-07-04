@@ -1,21 +1,21 @@
-from fastapi import FastAPI
+# backend/main.py
+from fastapi import FastAPI, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import Request
+from pydantic import BaseModel
 from src.fight_model import calculate_exchange_probabilities
 from src.simulate_fight import simulate_fight
-from src.ufc_scraper import get_upcoming_event_links
-from src.ufc_scraper import get_fight_card
+from src.ufc_scraper import get_upcoming_event_links, get_fight_card
 from src.fighter_scraper import scrape_fighter_stats, save_fighter_to_db
 from src.db import SessionLocal, Fighter
+from src.ensemble_predict import get_ensemble_prediction
 from types import SimpleNamespace
 from bs4 import BeautifulSoup
-from pydantic import BaseModel
 import requests
 import re
-
 import json
 import os
 from dotenv import load_dotenv
+
 load_dotenv()
 
 def to_stats_obj(d):
@@ -52,23 +52,18 @@ def get_fighter_image_url(name: str) -> str | None:
 
     try:
         res = requests.get(url, headers=headers, timeout=10)
-        print(f"📡 Response status: {res.status_code}")
         if res.status_code != 200:
             return None
 
         soup = BeautifulSoup(res.text, "html.parser")
 
-        # Try og:image first
         meta_tag = soup.find("meta", property="og:image")
         if meta_tag and meta_tag.get("content"):
-            print(f"✅ og:image found: {meta_tag['content']}")
             return meta_tag["content"]
 
-        # Try fallback with image src match
         img_tag = soup.find("img", {"src": re.compile(r"/images/styles/event_results_athlete_headshot")})
         if img_tag:
             src = img_tag["src"]
-            print(f"✅ fallback image found: {src}")
             return "https://ufc.com" + src if src.startswith("/") else src
 
     except Exception as e:
@@ -78,6 +73,10 @@ def get_fighter_image_url(name: str) -> str | None:
     return None
 
 
+@app.get("/")
+def read_root():
+    return {"message": "Hello from FastAPI!"}
+
 @app.get("/fighters")
 def list_fighters():
     db = SessionLocal()
@@ -85,11 +84,9 @@ def list_fighters():
     db.close()
     return [{"name": f.name, "image": f.image_url} for f in fighters]
 
-# Simulate endpoint
 @app.get("/simulate/{event_id}")
 def simulate_event(event_id: str):
     json_path = f"data/{event_id}.json"
-    
     if not os.path.exists(json_path):
         return {"error": f"No data file for event ID {event_id}"}
 
@@ -100,11 +97,10 @@ def simulate_event(event_id: str):
     stats_B = to_stats_obj(data["FighterB"])
 
     name_A = stats_A.name
-    name_B = stats_B.name   
+    name_B = stats_B.name
 
     P_A, P_B, P_neutral = calculate_exchange_probabilities(stats_A, stats_B)
-
-    results = simulate_fight(P_A, P_B, P_neutral, num_rounds=5, name_A=name_A, name_B=name_B)
+    results = simulate_fight(P_A, P_B, P_neutral, 5, name_A=name_A, name_B=name_B)
 
     return {
         "fighters": [name_A, name_B],
@@ -116,33 +112,19 @@ def simulate_event(event_id: str):
 def list_upcoming_events():
     try:
         raw_events = get_upcoming_event_links()
-
-        events = []
-        for e in raw_events:
-            event_id = e["url"].split("/")[-1]
-            events.append({
-                "id": event_id,
-                "name": e["title"],
-                "url": e["url"]
-            })
-
-        return events
+        return [{"id": e["url"].split("/")[-1], "name": e["title"], "url": e["url"]} for e in raw_events]
     except Exception as e:
         return {"error": str(e)}
-    
-@app.get("/simulate-event/{event_id}")
-def simulate_full_event(event_id: str):
-    event_url = f"http://ufcstats.com/event-details/{event_id}"
-    print(f"🔍 Scraping card from: {event_url}")
 
-    # Get the event title
+@app.get("/simulate-event/{event_id}")
+def simulate_full_event(event_id: str, model: str = Query("ensemble", enum=["sim", "ml", "ensemble"])):
+    event_url = f"http://ufcstats.com/event-details/{event_id}"
     try:
         response = requests.get(event_url)
         soup = BeautifulSoup(response.text, "html.parser")
-        event_title_tag = soup.find("h2", class_="b-content__title")
-        event_title = event_title_tag.get_text(strip=True) if event_title_tag else f"Event ID {event_id}"
-    except Exception as e:
-        print(f"⚠️ Failed to fetch event title: {e}")
+        title_tag = soup.find("h2", class_="b-content__title")
+        event_title = title_tag.get_text(strip=True) if title_tag else f"Event ID {event_id}"
+    except:
         event_title = f"Event ID {event_id}"
 
     card = get_fight_card(event_url)
@@ -158,55 +140,97 @@ def simulate_full_event(event_id: str):
         url_a = fight["url_a"]
         url_b = fight["url_b"]
 
-        # Fetch or scrape Fighter A
-        fighter_a = db.query(Fighter).filter(Fighter.name == name_a).first()
-        if not fighter_a:
+        f1 = db.query(Fighter).filter(Fighter.name == name_a).first()
+        if not f1:
             stats = scrape_fighter_stats(name_a, url_a)
             if stats:
                 image_url = get_fighter_image_url(name_a)
                 if image_url:
                     stats["image_url"] = image_url
                 save_fighter_to_db(stats)
-                fighter_a = db.query(Fighter).filter(Fighter.name == name_a).first()
+                f1 = db.query(Fighter).filter(Fighter.name == name_a).first()
 
-
-        # Fetch or scrape Fighter B
-        fighter_b = db.query(Fighter).filter(Fighter.name == name_b).first()
-        if not fighter_b:
+        f2 = db.query(Fighter).filter(Fighter.name == name_b).first()
+        if not f2:
             stats = scrape_fighter_stats(name_b, url_b)
             if stats:
                 image_url = get_fighter_image_url(name_b)
                 if image_url:
                     stats["image_url"] = image_url
                 save_fighter_to_db(stats)
-                fighter_b = db.query(Fighter).filter(Fighter.name == name_b).first()
+                f2 = db.query(Fighter).filter(Fighter.name == name_b).first()
 
+        if f1 and f2:
+            try:
+                if model == "sim":
+                    P_A, P_B, P_neutral = calculate_exchange_probabilities(f1, f2)
+                    results = simulate_fight(P_A, P_B, P_neutral, 5, name_A=name_a, name_B=name_b)
+                    fight_results.append({
+                        "fighters": [{"name": name_a, "image": f1.image_url}, {"name": name_b, "image": f2.image_url}],
+                        "model": "sim",
+                        "probabilities": {"P_A": P_A, "P_B": P_B, "P_neutral": P_neutral},
+                        "results": results
+                    })
+                else:
+                    results = get_ensemble_prediction(name_a, name_b, model)
+                    fight_results.append({
+                        "fighters": [
+                            {"name": name_a, "image": f1.image_url},
+                            {"name": name_b, "image": f2.image_url}
+                        ],
+                        "model": model,
+                        "results": {
+                            name_a: results["fighter_a_win_prob"],
+                            name_b: results["fighter_b_win_prob"],
+                            "Draw": 100.0 - results["fighter_a_win_prob"] - results["fighter_b_win_prob"]
+                        }
+                    })
 
-        if fighter_a and fighter_b:
-            P_A, P_B, P_neutral = calculate_exchange_probabilities(fighter_a, fighter_b)
-            results = simulate_fight(P_A, P_B, P_neutral, 5, name_A=name_a, name_B=name_b)
-
-            fight_results.append({
-                "fighters": [
-                    {"name": name_a, "image": fighter_a.image_url},
-                    {"name": name_b, "image": fighter_b.image_url}
-                ],
-                "probabilities": {"P_A": P_A, "P_B": P_B, "P_neutral": P_neutral},
-                "results": results
-            })
+            except Exception as e:
+                fight_results.append({"fighters": [name_a, name_b], "error": str(e)})
         else:
-            fight_results.append({
-                "fighters": [name_a, name_b],
-                "error": "Missing fighter stats"
-            })
+            fight_results.append({"fighters": [name_a, name_b], "error": "Missing fighter stats"})
 
     db.close()
+    return {"event": event_title, "model": model, "fights": fight_results}
 
-    return {
-    "event": event_title,
-    "fights": fight_results
-    }
+class CustomSimRequest(BaseModel):
+    fighter_a: str
+    fighter_b: str
+    model: str = "ensemble"
 
+@app.post("/simulate-custom")
+def simulate_custom_fight(req: CustomSimRequest):
+    db = SessionLocal()
+    name_a = req.fighter_a.strip()
+    name_b = req.fighter_b.strip()
+    model = req.model
+    f1 = db.query(Fighter).filter(Fighter.name == name_a).first()
+    f2 = db.query(Fighter).filter(Fighter.name == name_b).first()
+    db.close()
+
+    if not f1 or not f2:
+        return {"error": "One or both fighters not found in the database."}
+
+    try:
+        if model == "sim":
+            P_A, P_B, P_neutral = calculate_exchange_probabilities(f1, f2)
+            results = simulate_fight(P_A, P_B, P_neutral, 5, name_A=name_a, name_B=name_b)
+            return {
+                "fighters": [{"name": name_a, "image": f1.image_url}, {"name": name_b, "image": f2.image_url}],
+                "model": "sim",
+                "probabilities": {"P_A": P_A, "P_B": P_B, "P_neutral": P_neutral},
+                "results": results
+            }
+        else:
+            return get_ensemble_prediction(name_a, name_b, model)
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/ml-predict")
+def predict_from_ml(req: CustomSimRequest):
+    from src.ml.ml_predict import predict_fight_outcome
+    return predict_fight_outcome(req.fighter_a, req.fighter_b)
 
 @app.post("/refresh-images")
 def refresh_fighter_images():
@@ -214,7 +238,6 @@ def refresh_fighter_images():
     fighters = db.query(Fighter).all()
     updated = 0
     skipped = 0
-
     for fighter in fighters:
         image_url = get_fighter_image_url(fighter.name)
         if image_url:
@@ -223,50 +246,6 @@ def refresh_fighter_images():
                 updated += 1
             else:
                 skipped += 1
-        else:
-            print(f"⚠️ Could not fetch image for {fighter.name}")
-
     db.commit()
     db.close()
-    return {
-        "updated": updated,
-        "skipped": skipped,
-        "total": len(fighters)
-    }
-
-@app.get("/")
-def read_root():
-    return {"message": "Hello from FastAPI!"}
-
-class CustomSimRequest(BaseModel):
-    fighter_a: str
-    fighter_b: str
-
-@app.post("/simulate-custom")
-def simulate_custom_fight(req: CustomSimRequest):
-    db = SessionLocal()
-    name_a = req.fighter_a.strip()
-    name_b = req.fighter_b.strip()
-
-    fighter_a = db.query(Fighter).filter(Fighter.name == name_a).first()
-    fighter_b = db.query(Fighter).filter(Fighter.name == name_b).first()
-    db.close()
-
-    if fighter_a and fighter_b:
-        P_A, P_B, P_neutral = calculate_exchange_probabilities(fighter_a, fighter_b)
-        results = simulate_fight(P_A, P_B, P_neutral, 5, name_A=name_a, name_B=name_b)
-        return {
-            "fighters": [
-                {"name": name_a, "image": fighter_a.image_url},
-                {"name": name_b, "image": fighter_b.image_url}
-            ],
-            "probabilities": {"P_A": P_A, "P_B": P_B, "P_neutral": P_neutral},
-            "results": results
-        }
-
-    return {"error": "One or both fighters not found in the database."}
-
-@app.post("/ml-predict")
-def predict_from_ml(req: CustomSimRequest):
-    from src.ml.ml_predict import predict_fight_outcome
-    return predict_fight_outcome(req.fighter_a, req.fighter_b)
+    return {"updated": updated, "skipped": skipped, "total": len(fighters)}

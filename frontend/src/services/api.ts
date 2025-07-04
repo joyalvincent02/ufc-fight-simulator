@@ -6,11 +6,11 @@ export async function getEvents() {
   return res.json();
 }
 
-export async function simulateEvent(eventId: string) {
-  const res = await fetch(`${BASE_URL}/simulate-event/${eventId}`);
-  if (!res.ok) throw new Error("Failed to simulate event");
+export async function simulateEvent(eventId: string, model: string = "ensemble"): Promise<any> {
+  const res = await fetch(`${BASE_URL}/simulate-event/${eventId}?model=${model}`);
   return res.json();
 }
+
 
 export async function simulateCustomFight(fighterA: string, fighterB: string) {
   const res = await fetch(`${BASE_URL}/simulate-custom`, {

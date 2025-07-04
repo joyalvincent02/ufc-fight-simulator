@@ -14,7 +14,7 @@ type Fighter = {
 
 type SimFight = {
   fighters: [Fighter, Fighter];
-  probabilities: {
+  probabilities?: {
     P_A: number;
     P_B: number;
     P_neutral: number;
@@ -38,14 +38,16 @@ export default function SimulatePage() {
   const [data, setData] = useState<SimData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [model, setModel] = useState<string>("ensemble");
 
   useEffect(() => {
     if (!eventId) return;
-    simulateEvent(eventId)
+    setLoading(true);
+    simulateEvent(eventId, model)
       .then(setData)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [eventId]);
+  }, [eventId, model]);
 
   if (loading) return <Spinner />;
   if (error) return <div className="p-6 text-red-600">Error: {error}</div>;
@@ -58,14 +60,35 @@ export default function SimulatePage() {
       <div className="absolute bottom-[-80px] right-[-60px] w-[300px] h-[300px] bg-red-500 opacity-10 rounded-full blur-[100px] z-0" />
 
       <div className="relative z-10 max-w-4xl mx-auto">
-        <h1 className="text-4xl font-bold mb-10 text-center">Simulated Card: {data.event}</h1>
+        <h1 className="text-4xl font-bold mb-6 text-center">Simulated Card: {data.event}</h1>
+
+ <div className="flex justify-center mb-10">
+          <div className="flex items-center gap-4 bg-white/5 px-4 py-2 rounded-lg border border-white/10">
+            <label htmlFor="model" className="text-white font-medium whitespace-nowrap">
+              Prediction Model
+            </label>
+            <select
+              id="model"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              className="bg-gray-800 text-white px-3 py-1 rounded border border-gray-600"
+            >
+              <option value="ensemble">Ensemble</option>
+              <option value="ml">Machine Learning</option>
+              <option value="sim">Simulation</option>
+            </select>
+          </div>
+        </div>
 
         <div className="space-y-8">
           {data.fights.map((fight, i) => {
             const [A, B] = fight.fighters;
-            const { P_A, P_B, P_neutral } = fight.probabilities;
             const results = fight.results;
-            const drawPct = results["Draw"] || 0;
+            const drawPct = results?.["Draw"] || 0;
+
+            const P_A = fight.probabilities?.P_A ?? null;
+            const P_B = fight.probabilities?.P_B ?? null;
+            const P_neutral = fight.probabilities?.P_neutral ?? null;
 
             return (
               <div
@@ -78,8 +101,8 @@ export default function SimulatePage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   {[A, B].map((f, idx) => {
-                    const winPct = results[f.name] || 0;
-                    const otherWinPct = results[[A, B][1 - idx].name] || 0;
+                    const winPct = results?.[f.name] ?? 0;
+                    const otherWinPct = results?.[[A, B][1 - idx].name] ?? 0;
 
                     let borderColor = "border-white";
                     if (drawPct >= 45) {
@@ -100,20 +123,24 @@ export default function SimulatePage() {
                         />
                         <p className="text-lg font-bold">{f.name}</p>
                         <p className="text-sm text-gray-300">
-                          Win %: {results[f.name]?.toFixed(1)}%
+                          Win %: {winPct.toFixed(1)}%
                         </p>
-                        <p className="text-sm text-gray-400">
-                          Exchange Chance: {((idx === 0 ? P_A : P_B) * 100).toFixed(2)}%
-                        </p>
+                        {(P_A !== null && P_B !== null) && (
+                          <p className="text-sm text-gray-400">
+                            Exchange Chance: {(((idx === 0 ? P_A : P_B) ?? 0) * 100).toFixed(2)}%
+                          </p>
+                        )}
                       </div>
                     );
                   })}
                 </div>
 
-                <div className="mt-6 text-center text-sm text-gray-300">
-                  Neutral Exchanges: {(P_neutral * 100).toFixed(2)}% &nbsp;|&nbsp;
-                  Draws: {drawPct.toFixed(1)}%
-                </div>
+                {P_neutral !== null && (
+                  <div className="mt-6 text-center text-sm text-gray-300">
+                    Neutral Exchanges: {(P_neutral * 100).toFixed(2)}% &nbsp;|&nbsp;
+                    Draws: {drawPct.toFixed(1)}%
+                  </div>
+                )}
 
                 {fight.error && (
                   <div className="mt-4 text-center text-red-500 font-medium">
