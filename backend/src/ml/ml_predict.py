@@ -1,44 +1,140 @@
-# backend/src/ml/ml_predict.py
-
-import joblib
+import pandas as pd
 import numpy as np
-from src.db import SessionLocal, Fighter
+import joblib
 
 model = joblib.load("src/ml/fight_predictor.pkl")
 
-def get_fighter_features(session, name):
-    fighter = session.query(Fighter).filter(Fighter.name == name).first()
-    if not fighter:
-        raise ValueError(f"Fighter '{name}' not found in database.")
-    return [
-        fighter.slpm,
-        fighter.str_acc,
-        fighter.str_def,
-        fighter.td_avg,
-        fighter.td_acc,
-        fighter.td_def,
-        fighter.sub_avg,
-    ]
+def predict_fight_outcome(name_a, name_b):
+    from src.db import SessionLocal, Fighter
 
-def predict_fight_outcome(fighter_a_name: str, fighter_b_name: str):
     db = SessionLocal()
+    f1 = db.query(Fighter).filter(Fighter.name == name_a).first()
+    f2 = db.query(Fighter).filter(Fighter.name == name_b).first()
+    db.close()
 
-    try:
-        fighter_a_stats = get_fighter_features(db, fighter_a_name)
-        fighter_b_stats = get_fighter_features(db, fighter_b_name)
+    if not f1 or not f2:
+        raise ValueError("One or both fighters not found.")
 
-        # Concatenate feature vectors: [A stats..., B stats...]
-        features = np.array(fighter_a_stats + fighter_b_stats).reshape(1, -1)
-        prob = model.predict_proba(features)[0]
+    def safe(val):
+        return float(val) if val is not None else 0.0
 
-        db.close()
+    def height_inches(h):
+        if not h or "'" not in h:
+            return 0
+        parts = h.strip().split("'")
+        return int(parts[0]) * 12 + int(parts[1].strip('" ')) if len(parts) == 2 else 0
 
-        return {
-            "fighter_a": fighter_a_name,
-            "fighter_b": fighter_b_name,
-            "fighter_a_win_prob": round(prob[1] * 100, 2),
-            "fighter_b_win_prob": round(prob[0] * 100, 2)
+    def weight_lbs(w):
+        return int(w.replace("lbs.", "").strip()) if w and "lbs." in w else 0
+
+    def reach_inches(r):
+        return int(r.replace('"', '').strip()) if r and '"' in r else 0
+
+    def compute_age(dob):
+        if not dob:
+            return 0
+        from datetime import date
+        today = date.today()
+        return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+
+    def compute_mismatch_penalty(weight_diff, height_diff, reach_diff):
+        """Returns a penalty score between 0 and 1 based on mismatch severity."""
+        abs_w = abs(weight_diff)
+        abs_h = abs(height_diff)
+        abs_r = abs(reach_diff)
+
+        mismatch_score = (
+            (abs_w / 100) * 0.5 +   # weight → up to 0.5
+            (abs_h / 10) * 0.3 +    # height → up to 0.3
+            (abs_r / 15) * 0.2      # reach  → up to 0.2
+        )
+        return min(mismatch_score, 1.0)
+
+    # Compute raw values
+    f1_height = height_inches(f1.height)
+    f2_height = height_inches(f2.height)
+    f1_weight = weight_lbs(f1.weight)
+    f2_weight = weight_lbs(f2.weight)
+    f1_reach = reach_inches(f1.reach)
+    f2_reach = reach_inches(f2.reach)
+
+    height_diff = f1_height - f2_height
+    weight_diff = f1_weight - f2_weight
+    reach_diff = f1_reach - f2_reach
+    age_diff = compute_age(f1.dob) - compute_age(f2.dob)
+
+    # Build feature vector
+    features = {
+        "f1_slpm": safe(f1.slpm),
+        "f1_str_acc": safe(f1.str_acc),
+        "f1_str_def": safe(f1.str_def),
+        "f1_td_avg": safe(f1.td_avg),
+        "f1_td_acc": safe(f1.td_acc),
+        "f1_td_def": safe(f1.td_def),
+        "f1_sub_avg": safe(f1.sub_avg),
+        "f2_slpm": safe(f2.slpm),
+        "f2_str_acc": safe(f2.str_acc),
+        "f2_str_def": safe(f2.str_def),
+        "f2_td_avg": safe(f2.td_avg),
+        "f2_td_acc": safe(f2.td_acc),
+        "f2_td_def": safe(f2.td_def),
+        "f2_sub_avg": safe(f2.sub_avg),
+        "reach_diff": reach_diff,
+        "height_diff": height_diff,
+        "weight_diff": weight_diff,
+        "age_diff": age_diff,
+    }
+
+    # Add one-hot encoded stance features
+    model_features = model.feature_names_in_
+    stance_keys = [col for col in model_features if "stance" in col]
+    for key in stance_keys:
+        features[key] = 0
+
+    if f1.stance:
+        key = f"f1_stance_{f1.stance}"
+        if key in features:
+            features[key] = 1
+    if f2.stance:
+        key = f"f2_stance_{f2.stance}"
+        if key in features:
+            features[key] = 1
+
+    # Build input for model
+    input_df = pd.DataFrame([features], columns=model_features)
+    model_prob = model.predict_proba(input_df)[0]  # [prob_fighter_b_win, prob_fighter_a_win]
+
+    # Compute penalty
+    penalty_score = compute_mismatch_penalty(weight_diff, height_diff, reach_diff)
+
+    # Scale probabilities toward heavier fighter
+    if weight_diff > 0:
+        # Fighter A is heavier
+        adjusted = [
+            model_prob[0] * (1 - penalty_score),
+            model_prob[1] * (1 + penalty_score)
+        ]
+    else:
+        # Fighter B is heavier
+        adjusted = [
+            model_prob[0] * (1 + penalty_score),
+            model_prob[1] * (1 - penalty_score)
+        ]
+
+    # Normalize
+    total = sum(adjusted)
+    prob = [p / total for p in adjusted]
+
+    return {
+        "fighter_a": name_a,
+        "fighter_b": name_b,
+        "fighter_a_win_prob": round(prob[1] * 100, 1),
+        "fighter_b_win_prob": round(prob[0] * 100, 1),
+        "penalty_score": round(penalty_score, 3),
+        "diffs": {
+            "weight_diff": weight_diff,
+            "height_diff": height_diff,
+            "reach_diff": reach_diff,
+            "age_diff": age_diff
         }
-    except Exception as e:
-        db.close()
-        raise e
+    }
