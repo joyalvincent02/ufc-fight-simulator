@@ -9,3 +9,6 @@ python-multipart
 numpy
 python-dotenv
 psycopg2-binary
+scikit-learn
+pandas
+joblib

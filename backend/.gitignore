@@ -1,8 +1,35 @@
+# Python environment and bytecode
 venv/
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# SQLite database
+data/*.db
 *.db
+
+# Environment variables
 .env
+
+# Jupyter notebooks checkpoints
 .ipynb_checkpoints/
+
+# pytest and test caches
+.pytest_cache/
+.cache/
+
+# Machine Learning model files
+src/ml/*.pkl
+
+# Logs (if you add any)
+*.log
+
+# OS / IDE / editor specific files
+.DS_Store
+*.swp
+*.swo
+*.bak
+
+# VSCode settings (optional)
+.vscode/

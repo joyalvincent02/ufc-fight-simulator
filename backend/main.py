@@ -265,3 +265,8 @@ def simulate_custom_fight(req: CustomSimRequest):
         }
 
     return {"error": "One or both fighters not found in the database."}
+
+@app.post("/ml-predict")
+def predict_from_ml(req: CustomSimRequest):
+    from src.ml.ml_predict import predict_fight_outcome
+    return predict_fight_outcome(req.fighter_a, req.fighter_b)

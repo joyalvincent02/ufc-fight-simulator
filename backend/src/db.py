@@ -1,14 +1,12 @@
+from sqlalchemy import create_engine, Column, String, Float, DateTime, Integer, Date
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from datetime import datetime
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from sqlalchemy import create_engine, Column, String, Float, DateTime
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from datetime import datetime
-
-# Create DB engine (for dev, use SQLite file)
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/fighter_stats.db")
 
 engine = create_engine(
@@ -16,7 +14,6 @@ engine = create_engine(
     connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 Base = declarative_base()
 
 class Fighter(Base):
@@ -34,6 +31,9 @@ class Fighter(Base):
     sub_avg = Column(Float)
     last_updated = Column(DateTime, default=datetime.utcnow)
 
-# Create tables (run this once)
-def init_db():
-    Base.metadata.create_all(bind=engine)
+    # 🆕 New physical/statistical attributes
+    height = Column(Integer, nullable=True)   # in inches
+    weight = Column(Integer, nullable=True)   # in lbs
+    reach = Column(Integer, nullable=True)    # in inches
+    stance = Column(String, nullable=True)
+    dob = Column(Date, nullable=True)
