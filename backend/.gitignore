@@ -19,9 +19,6 @@ data/*.db
 .pytest_cache/
 .cache/
 
-# Machine Learning model files
-src/ml/*.pkl
-
 # Logs (if you add any)
 *.log
 
