@@ -22,6 +22,7 @@ export default function SchedulerStatus() {
     const [loading, setLoading] = useState(true);
     const [checking, setChecking] = useState({ results: false, events: false });
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [isExpanded, setIsExpanded] = useState(false);
 
     useEffect(() => {
         fetchStatus();
@@ -93,9 +94,9 @@ export default function SchedulerStatus() {
         setMessage(null);
         
         try {
-            await manualEventCheck();
-            setMessage({ type: 'success', text: 'Event check completed successfully' });
-            fetchStatus(); // Refresh status
+            const result = await manualEventCheck();
+            setMessage({ type: 'success', text: result.message || 'Event check completed successfully' });
+            fetchStatus(); // Refresh status to get updated timestamps
         } catch (error) {
             setMessage({ type: 'error', text: 'Failed to check events' });
         } finally {
@@ -125,10 +126,20 @@ export default function SchedulerStatus() {
     return (
         <div className="bg-black/20 rounded-xl border border-white/10 overflow-hidden">
             {/* Header */}
-            <div className="p-6 border-b border-white/10">
+            <div 
+                className="p-6 border-b border-white/10 cursor-pointer hover:bg-white/5 transition-colors"
+                onClick={() => setIsExpanded(!isExpanded)}
+            >
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <h3 className="text-xl font-bold text-white">Scheduler Status</h3>
+                        <div className="flex items-center gap-2">
+                            <h3 className="text-xl font-bold text-white">Scheduler Status</h3>
+                            <div className={`transform transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}>
+                                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                            </div>
+                        </div>
                         <div className={`flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-medium ${
                             status.running 
                                 ? 'bg-green-900/30 text-green-300 border border-green-500/30'
@@ -141,7 +152,10 @@ export default function SchedulerStatus() {
                     
                     <div className="flex gap-2">
                         <button
-                            onClick={handleManualResultCheck}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleManualResultCheck();
+                            }}
                             disabled={checking.results}
                             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                         >
@@ -149,7 +163,10 @@ export default function SchedulerStatus() {
                             Check Results
                         </button>
                         <button
-                            onClick={handleManualEventCheck}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleManualEventCheck();
+                            }}
                             disabled={checking.events}
                             className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-800 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                         >
@@ -170,61 +187,64 @@ export default function SchedulerStatus() {
                 )}
             </div>
 
-            <div className="p-6 space-y-6">
-                {/* Scheduled Jobs */}
-                <div>
-                    <h4 className="text-lg font-semibold text-white mb-4">Scheduled Jobs</h4>
-                    <div className="space-y-3">
-                        {status.jobs.map((job) => (
-                            <div key={job.id} className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
-                                <div>
-                                    <div className="font-medium text-white">{job.name}</div>                                </div>
-                                <div className="text-right">
-                                    <div className="text-sm font-medium text-gray-300">
-                                        Next run: {formatNextRun(job.next_run)}
-                                    </div>
-                                    {job.next_run && (
-                                        <div className="text-xs text-gray-500">
-                                            {formatDateTime(job.next_run)}
+            {/* Collapsible Content */}
+            {isExpanded && (
+                <div className="p-6 space-y-6">
+                    {/* Scheduled Jobs */}
+                    <div>
+                        <h4 className="text-lg font-semibold text-white mb-4">Scheduled Jobs</h4>
+                        <div className="space-y-3">
+                            {status.jobs.map((job) => (
+                                <div key={job.id} className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
+                                    <div>
+                                        <div className="font-medium text-white">{job.name}</div>                                </div>
+                                    <div className="text-right">
+                                        <div className="text-sm font-medium text-gray-300">
+                                            Next run: {formatNextRun(job.next_run)}
                                         </div>
-                                    )}
+                                        {job.next_run && (
+                                            <div className="text-xs text-gray-500">
+                                                {formatDateTime(job.next_run)}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Last Update Times */}
+                    <div>
+                        <h4 className="text-lg font-semibold text-white mb-4">Last Updates</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="p-4 bg-white/5 rounded-lg">
+                                <div className="text-sm text-gray-400">Event Check</div>
+                                <div className="font-medium text-white">
+                                    {formatDateTime(status.last_event_check)}
                                 </div>
                             </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Last Update Times */}
-                <div>
-                    <h4 className="text-lg font-semibold text-white mb-4">Last Updates</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="p-4 bg-white/5 rounded-lg">
-                            <div className="text-sm text-gray-400">Event Check</div>
-                            <div className="font-medium text-white">
-                                {formatDateTime(status.last_event_check)}
+                            <div className="p-4 bg-white/5 rounded-lg">
+                                <div className="text-sm text-gray-400">Profile Update</div>
+                                <div className="font-medium text-white">
+                                    {formatDateTime(status.last_profile_update)}
+                                </div>
                             </div>
-                        </div>
-                        <div className="p-4 bg-white/5 rounded-lg">
-                            <div className="text-sm text-gray-400">Profile Update</div>
-                            <div className="font-medium text-white">
-                                {formatDateTime(status.last_profile_update)}
+                            <div className="p-4 bg-white/5 rounded-lg">
+                                <div className="text-sm text-gray-400">Result Check</div>
+                                <div className="font-medium text-white">
+                                    {formatDateTime(status.last_result_check)}
+                                </div>
                             </div>
-                        </div>
-                        <div className="p-4 bg-white/5 rounded-lg">
-                            <div className="text-sm text-gray-400">Result Check</div>
-                            <div className="font-medium text-white">
-                                {formatDateTime(status.last_result_check)}
-                            </div>
-                        </div>
-                        <div className="p-4 bg-white/5 rounded-lg">
-                            <div className="text-sm text-gray-400">Database Cleanup</div>
-                            <div className="font-medium text-white">
-                                {formatDateTime(status.last_cleanup)}
+                            <div className="p-4 bg-white/5 rounded-lg">
+                                <div className="text-sm text-gray-400">Database Cleanup</div>
+                                <div className="font-medium text-white">
+                                    {formatDateTime(status.last_cleanup)}
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 }

@@ -11,7 +11,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR, EVENT_JOB_MISSED
-from src.db import SessionLocal, ModelPrediction, Fighter
+from src.db import SessionLocal, ModelPrediction, Fighter, SchedulerMetadata
 from src.ufc_scraper import get_upcoming_event_links, get_fight_card
 from src.ensemble_predict import get_ensemble_prediction
 from src.fighter_scraper import scrape_fighter_stats, save_fighter_to_db
@@ -63,6 +63,9 @@ class UFCScheduler:
         self.last_profile_update = None
         self.last_result_check = None
         self.last_cleanup = None
+        
+        # Load persisted timestamps from database
+        self._load_timestamps()
     
     def start(self):
         """Start the scheduler"""
@@ -253,6 +256,19 @@ class UFCScheduler:
             logger.error(f"Manual event check failed: {e}")
             return {"error": str(e)}
     
+    def check_new_events_manual(self):
+        """Manual trigger for checking new events (called from API)"""
+        try:
+            logger.info("Manual trigger: Checking new events...")
+            job_check_new_events()  # Call the module-level function
+            return {
+                "message": "Manual event check completed",
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        except Exception as e:
+            logger.error(f"Manual event check failed: {e}")
+            return {"error": str(e)}
+    
     def _check_completed_events(self):
         """Check for completed events and update results"""
         try:
@@ -314,6 +330,65 @@ class UFCScheduler:
         except Exception as e:
             logger.error(f"Error during cleanup: {e}")
             logger.error(traceback.format_exc())
+    
+    def _save_metadata(self, key: str, value: str):
+        """Save scheduler metadata to database"""
+        try:
+            db = SessionLocal()
+            metadata = db.query(SchedulerMetadata).filter(SchedulerMetadata.key == key).first()
+            
+            if metadata:
+                metadata.value = value
+                metadata.updated_at = datetime.utcnow()
+            else:
+                metadata = SchedulerMetadata(key=key, value=value, updated_at=datetime.utcnow())
+                db.add(metadata)
+            
+            db.commit()
+            db.close()
+        except Exception as e:
+            logger.error(f"Failed to save metadata {key}: {e}")
+    
+    def _load_metadata(self, key: str) -> str | None:
+        """Load scheduler metadata from database"""
+        try:
+            db = SessionLocal()
+            metadata = db.query(SchedulerMetadata).filter(SchedulerMetadata.key == key).first()
+            db.close()
+            return metadata.value if metadata else None
+        except Exception as e:
+            logger.error(f"Failed to load metadata {key}: {e}")
+            return None
+    
+    def _load_timestamps(self):
+        """Load all timestamp data from database on startup"""
+        last_event_check = self._load_metadata('last_event_check')
+        if last_event_check:
+            try:
+                self.last_event_check = datetime.fromisoformat(last_event_check)
+            except ValueError:
+                self.last_event_check = None
+        
+        last_profile_update = self._load_metadata('last_profile_update')
+        if last_profile_update:
+            try:
+                self.last_profile_update = datetime.fromisoformat(last_profile_update)
+            except ValueError:
+                self.last_profile_update = None
+                
+        last_result_check = self._load_metadata('last_result_check')
+        if last_result_check:
+            try:
+                self.last_result_check = datetime.fromisoformat(last_result_check)
+            except ValueError:
+                self.last_result_check = None
+                
+        last_cleanup = self._load_metadata('last_cleanup')
+        if last_cleanup:
+            try:
+                self.last_cleanup = datetime.fromisoformat(last_cleanup)
+            except ValueError:
+                self.last_cleanup = None
     
     def get_status(self):
         """Get scheduler status and last update times"""
@@ -407,7 +482,9 @@ def job_check_new_events():
         
         # Update the global scheduler instance's timestamp
         scheduler = get_scheduler()
-        scheduler.last_event_check = datetime.utcnow()
+        timestamp = datetime.utcnow()
+        scheduler.last_event_check = timestamp
+        scheduler._save_metadata('last_event_check', timestamp.isoformat())
         
     except Exception as e:
         logger.error(f"Error in new event detection job: {e}")
@@ -445,7 +522,9 @@ def job_update_fighter_profiles():
         
         # Update the global scheduler instance's timestamp
         scheduler = get_scheduler()
-        scheduler.last_profile_update = datetime.utcnow()
+        timestamp = datetime.utcnow()
+        scheduler.last_profile_update = timestamp
+        scheduler._save_metadata('last_profile_update', timestamp.isoformat())
         
     except Exception as e:
         logger.error(f"Error in fighter profile updates job: {e}")
@@ -474,7 +553,9 @@ def job_check_completed_events():
         
         # Update the global scheduler instance's timestamp
         scheduler = get_scheduler()
-        scheduler.last_result_check = datetime.utcnow()
+        timestamp = datetime.utcnow()
+        scheduler.last_result_check = timestamp
+        scheduler._save_metadata('last_result_check', timestamp.isoformat())
         
     except Exception as e:
         logger.error(f"Error checking completed events job: {e}")
@@ -506,7 +587,9 @@ def job_cleanup_old_predictions():
         
         # Update the global scheduler instance's timestamp
         scheduler = get_scheduler()
-        scheduler.last_cleanup = datetime.utcnow()
+        timestamp = datetime.utcnow()
+        scheduler.last_cleanup = timestamp
+        scheduler._save_metadata('last_cleanup', timestamp.isoformat())
         
     except Exception as e:
         logger.error(f"Error during cleanup job: {e}")

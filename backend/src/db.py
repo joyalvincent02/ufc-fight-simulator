@@ -74,6 +74,14 @@ class FightResult(Base):
     event_date = Column(String, nullable=True)  # Keep as string to match existing
 
 
+class SchedulerMetadata(Base):
+    __tablename__ = "scheduler_metadata"
+
+    key = Column(String, primary_key=True, index=True)
+    value = Column(String, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+
 # Create all tables
 Base.metadata.create_all(bind=engine)
 
