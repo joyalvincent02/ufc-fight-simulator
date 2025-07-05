@@ -104,7 +104,7 @@ export default function CustomSimPage() {
       </div>
 
       <div className="text-center">
-        <p className="text-sm text-gray-400 mb-4">
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
           ⚠️ Not all fighters are available yet but the database is continuously being updated.
         </p>
         <button
@@ -117,7 +117,7 @@ export default function CustomSimPage() {
       </div>
 
       {error && (
-        <p className="mt-4 text-red-500 text-center text-sm font-medium">{error}</p>
+        <p className="mt-4 text-red-600 dark:text-red-400 text-center text-sm font-medium">{error}</p>
       )}
 
       {loading && (
@@ -127,8 +127,8 @@ export default function CustomSimPage() {
       )}
 
       {result && (
-        <div className="mt-10 bg-white/5 border border-white/10 backdrop-blur-md rounded-xl p-6 shadow-lg text-white">
-          <h2 className="text-2xl font-semibold text-center mb-6">
+        <div className="mt-10 bg-white/80 dark:bg-white/5 border border-gray-200 dark:border-white/10 backdrop-blur-md rounded-xl p-6 shadow-lg text-gray-900 dark:text-white">
+          <h2 className="text-2xl font-semibold text-center mb-6 text-gray-900 dark:text-white">
             {result.fighters?.[0]?.name || fighterA} vs {result.fighters?.[1]?.name || fighterB}
           </h2>
 
@@ -163,7 +163,7 @@ export default function CustomSimPage() {
           </div>
 
           {result.probabilities && (
-            <div className="mt-6 text-center text-sm text-gray-300">
+            <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-300">
               Neutral Exchanges: {(result.probabilities.P_neutral * 100).toFixed(2)}% &nbsp;|&nbsp;
               Draws: {result.results?.["Draw"]?.toFixed(1) || "0.0"}%
             </div>

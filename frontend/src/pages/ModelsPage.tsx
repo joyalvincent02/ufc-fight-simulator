@@ -80,19 +80,17 @@ export default function ModelPage() {
     }
   ];
   return (
-    <div className="min-h-screen bg-black text-white font-sans relative overflow-hidden px-4 sm:px-6 py-16">
+    <div className="min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-white font-sans relative overflow-hidden px-4 sm:px-6 py-16">
       {/* Background glow accents */}
-      <div className="absolute -top-20 -left-32 w-[500px] h-[500px] bg-red-700 opacity-20 rounded-full blur-[160px] z-0" />
-      <div className="absolute bottom-[-80px] right-[-60px] w-[300px] h-[300px] bg-red-500 opacity-10 rounded-full blur-[100px] z-0" />
+      <div className="absolute -top-20 -left-32 w-[500px] h-[500px] bg-red-700 opacity-5 dark:opacity-20 rounded-full blur-[160px] z-0" />
+      <div className="absolute bottom-[-80px] right-[-60px] w-[300px] h-[300px] bg-red-500 opacity-5 dark:opacity-10 rounded-full blur-[100px] z-0" />
 
       <div className="relative z-10 max-w-4xl mx-auto">
         <h1 className="text-4xl sm:text-5xl font-bold text-center mb-10 tracking-tight">
           How the Prediction Models Work
-        </h1>
-
-        <section className="bg-white/5 border border-white/10 backdrop-blur-md p-6 sm:p-8 rounded-xl shadow space-y-6 leading-relaxed text-gray-100 text-base">
-        <p>
-          The <strong className="text-white">MMA Math simulator</strong> offers three different prediction models to forecast UFC fight outcomes.
+        </h1>        <section className="bg-white/90 dark:bg-white/5 border border-gray-200 dark:border-white/10 backdrop-blur-md p-6 sm:p-8 rounded-xl shadow space-y-6 leading-relaxed text-gray-700 dark:text-gray-100 text-base">
+          <p>
+            The <strong className="text-gray-900 dark:text-white">MMA Math simulator</strong> offers three different prediction models to forecast UFC fight outcomes.
           All models use real-world fighter statistics scraped from UFCStats.com to make their predictions.
         </p>
 

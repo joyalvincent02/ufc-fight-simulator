@@ -59,24 +59,24 @@ export default function SimulatePage() {
   if (!data) return null;
 
   return (
-    <div className="min-h-screen bg-black text-white py-12 px-4 sm:px-6 lg:px-8 font-sans relative overflow-hidden">
+    <div className="min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-white py-12 px-4 sm:px-6 lg:px-8 font-sans relative overflow-hidden">
       {/* Soft glow accents */}
-      <div className="absolute -top-20 -left-32 w-[500px] h-[500px] bg-red-700 opacity-20 rounded-full blur-[160px] z-0" />
-      <div className="absolute bottom-[-80px] right-[-60px] w-[300px] h-[300px] bg-red-500 opacity-10 rounded-full blur-[100px] z-0" />
+      <div className="absolute -top-20 -left-32 w-[500px] h-[500px] bg-red-200 dark:bg-red-700 opacity-20 rounded-full blur-[160px] z-0" />
+      <div className="absolute bottom-[-80px] right-[-60px] w-[300px] h-[300px] bg-red-100 dark:bg-red-500 opacity-10 rounded-full blur-[100px] z-0" />
 
       <div className="relative z-10 max-w-4xl mx-auto">
-        <h1 className="text-4xl font-bold mb-6 text-center">Simulated Card: {data.event}</h1>
+        <h1 className="text-4xl font-bold mb-6 text-center text-gray-900 dark:text-white">Simulated Card: {data.event}</h1>
 
         <div className="flex justify-center mb-10">
-          <div className="flex items-center gap-4 bg-white/5 px-4 py-2 rounded-lg border border-white/10">
-            <label htmlFor="model" className="text-white font-medium whitespace-nowrap">
+          <div className="flex items-center gap-4 bg-white/90 dark:bg-white/5 px-4 py-2 rounded-lg border border-gray-200 dark:border-white/10">
+            <label htmlFor="model" className="text-gray-900 dark:text-white font-medium whitespace-nowrap">
               Prediction Model
             </label>
             <select
               id="model"
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              className="bg-gray-800 text-white px-3 py-1 rounded border border-gray-600"
+              className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1 rounded border border-gray-300 dark:border-gray-600"
             >
               <option value="ensemble">Ensemble</option>
               <option value="ml">Machine Learning</option>
@@ -102,9 +102,9 @@ export default function SimulatePage() {
             return (
               <div
                 key={i}
-                className="bg-white/5 border border-white/10 backdrop-blur-md rounded-xl p-6 shadow-lg"
+                className="bg-white/90 dark:bg-white/5 border border-gray-200 dark:border-white/10 backdrop-blur-md rounded-xl p-6 shadow-lg"
               >
-                <h2 className="text-2xl font-semibold text-center mb-6">
+                <h2 className="text-2xl font-semibold text-center mb-6 text-gray-900 dark:text-white">
                   {A.name} vs {B.name}
                 </h2>
 
@@ -137,7 +137,7 @@ export default function SimulatePage() {
                 </div>
 
                 {P_neutral !== null && (
-                  <div className="mt-6 text-center text-sm text-gray-300">
+                  <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-300">
                     Neutral Exchanges: {(P_neutral * 100).toFixed(2)}% &nbsp;|&nbsp;
                     Draws: {drawPct.toFixed(1)}%
                   </div>
@@ -145,53 +145,53 @@ export default function SimulatePage() {
 
                 {(penaltyScore !== null && diffs && model !== 'sim') && (
                   <div className="mt-6">
-                    <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 p-4 rounded-lg border border-blue-500/30">
+                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-500/30">
                       <div className="flex items-center gap-2 mb-3">
-                        <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                        <h3 className="font-semibold text-blue-300">
+                        <div className="w-2 h-2 bg-blue-500 dark:bg-blue-400 rounded-full"></div>
+                        <h3 className="font-semibold text-blue-700 dark:text-blue-300">
                           {model === 'ml' ? 'ML Model Analysis' : 'Ensemble Model Analysis'}
                         </h3>
                       </div>
 
                       <div className="flex flex-col md:flex-row gap-4 text-sm">
                         {/* Mismatch Penalty */}
-                        <div className="flex-1 bg-black/20 p-4 rounded-lg border border-white/10 flex flex-col justify-center items-center text-center">
-                          <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Mismatch Penalty</p>
-                          <p className="text-3xl font-bold text-yellow-400">{(penaltyScore * 100).toFixed(1)}%</p>
+                        <div className="flex-1 bg-white/80 dark:bg-black/20 p-4 rounded-lg border border-gray-200 dark:border-white/10 flex flex-col justify-center items-center text-center">
+                          <p className="text-gray-600 dark:text-gray-400 text-xs uppercase tracking-wide mb-1">Mismatch Penalty</p>
+                          <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">{(penaltyScore * 100).toFixed(1)}%</p>
                         </div>
 
                         {/* Physical Advantages */}
-                        <div className="flex-[2] bg-black/20 p-4 rounded-lg border border-white/10">
-                          <p className="text-gray-400 text-xs uppercase tracking-wide mb-2">Physical Advantages</p>
+                        <div className="flex-[2] bg-white/80 dark:bg-black/20 p-4 rounded-lg border border-gray-200 dark:border-white/10">
+                          <p className="text-gray-600 dark:text-gray-400 text-xs uppercase tracking-wide mb-2">Physical Advantages</p>
                           <div className="grid grid-cols-2 gap-y-3 gap-x-8 text-xs">
                             {/* Weight */}
                             <div className="flex items-center">
-                              <span className="text-gray-300 min-w-[52px]">Weight:</span>
-                              <span className="text-white font-medium">{diffs.weight_diff === 0 ? 'Even' :
+                              <span className="text-gray-600 dark:text-gray-300 min-w-[52px]">Weight:</span>
+                              <span className="text-gray-900 dark:text-white font-medium">{diffs.weight_diff === 0 ? 'Even' :
                                 `${diffs.weight_diff > 0 ? A.name : B.name} +${Math.abs(diffs.weight_diff)}lbs`}
                               </span>
                             </div>
 
                             {/* Height */}
                             <div className="flex items-center">
-                              <span className="text-gray-300 min-w-[52px]">Height:</span>
-                              <span className="text-white font-medium">{diffs.height_diff === 0 ? 'Even' :
+                              <span className="text-gray-600 dark:text-gray-300 min-w-[52px]">Height:</span>
+                              <span className="text-gray-900 dark:text-white font-medium">{diffs.height_diff === 0 ? 'Even' :
                                 `${diffs.height_diff > 0 ? A.name : B.name} +${Math.abs(diffs.height_diff)}"`}
                               </span>
                             </div>
 
                             {/* Reach */}
                             <div className="flex items-center">
-                              <span className="text-gray-300 min-w-[52px]">Reach:</span>
-                              <span className="text-white font-medium">{diffs.reach_diff === 0 ? 'Even' :
+                              <span className="text-gray-600 dark:text-gray-300 min-w-[52px]">Reach:</span>
+                              <span className="text-gray-900 dark:text-white font-medium">{diffs.reach_diff === 0 ? 'Even' :
                                 `${diffs.reach_diff > 0 ? A.name : B.name} +${Math.abs(diffs.reach_diff)}"`}
                               </span>
                             </div>
 
                             {/* Age */}
                             <div className="flex items-center">
-                              <span className="text-gray-300 min-w-[52px]">Age:</span>
-                              <span className="text-white font-medium">{diffs.age_diff === 0 ? 'Even' :
+                              <span className="text-gray-600 dark:text-gray-300 min-w-[52px]">Age:</span>
+                              <span className="text-gray-900 dark:text-white font-medium">{diffs.age_diff === 0 ? 'Even' :
                                 `${diffs.age_diff < 0 ? A.name : B.name} ${Math.abs(diffs.age_diff)}yr(s) younger`}
                               </span>
                             </div>
@@ -202,9 +202,9 @@ export default function SimulatePage() {
                       </div>
 
                       {/* Model Interpretation */}
-                      <div className="mt-5 pt-4 border-t border-white/10">
-                        <div className="flex items-center gap-2 text-xs text-gray-400">
-                          <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                      <div className="mt-5 pt-4 border-t border-gray-200 dark:border-white/10">
+                        <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                          <div className="w-1 h-1 bg-gray-600 dark:bg-gray-400 rounded-full"></div>
                           <span>
                             {penaltyScore > 0.3 ? 'High mismatch detected - significant physical differences' :
                               penaltyScore > 0.15 ? 'Moderate mismatch - notable physical differences' :
@@ -217,7 +217,7 @@ export default function SimulatePage() {
                 )}
 
                 {fight.error && (
-                  <div className="mt-4 text-center text-red-500 font-medium">
+                  <div className="mt-4 text-center text-red-600 dark:text-red-400 font-medium">
                     ⚠️ {fight.error}
                   </div>
                 )}

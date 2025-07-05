@@ -48,19 +48,19 @@ export default function FighterCard({
         className="w-24 h-24 rounded-full object-cover border-4 mb-3"
         onError={handleImageError}
       />
-      <p className="text-lg font-bold">{name}</p>
-      <p className="text-sm text-gray-300">
+      <p className="text-lg font-bold text-gray-900 dark:text-white">{name}</p>
+      <p className="text-sm text-gray-600 dark:text-gray-300">
         Win %: {winPercentage.toFixed(1)}%
       </p>
       {showExchangeChance && exchangeChance !== undefined && (
-        <p className="text-sm text-gray-400">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
           Exchange Chance: {(exchangeChance * 100).toFixed(2)}%
         </p>
       )}
       {penaltyScore !== undefined && (
-        <div className="text-xs text-gray-400 mt-2">
-          <div className="bg-gray-800/50 px-2 py-1 rounded border border-gray-600">
-            <p className="text-yellow-400 font-medium">Penalty: {(penaltyScore * 100).toFixed(1)}%</p>
+        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+          <div className="bg-gray-100 dark:bg-gray-800/50 px-2 py-1 rounded border border-gray-300 dark:border-gray-600">
+            <p className="text-yellow-600 dark:text-yellow-400 font-medium">Penalty: {(penaltyScore * 100).toFixed(1)}%</p>
           </div>
         </div>
       )}

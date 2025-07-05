@@ -106,10 +106,10 @@ export default function SchedulerStatus() {
 
     if (loading) {
         return (
-            <div className="bg-black/20 rounded-xl border border-white/10 p-6">
+            <div className="bg-white/80 dark:bg-black/20 rounded-xl border border-gray-200 dark:border-white/10 p-6">
                 <div className="flex items-center gap-2">
                     <div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-gray-300">Loading scheduler status...</span>
+                    <span className="text-gray-600 dark:text-gray-300">Loading scheduler status...</span>
                 </div>
             </div>
         );
@@ -117,33 +117,33 @@ export default function SchedulerStatus() {
 
     if (!status) {
         return (
-            <div className="bg-black/20 rounded-xl border border-white/10 p-6">
-                <p className="text-red-400">Failed to load scheduler status</p>
+            <div className="bg-white/80 dark:bg-black/20 rounded-xl border border-gray-200 dark:border-white/10 p-6">
+                <p className="text-red-500 dark:text-red-400">Failed to load scheduler status</p>
             </div>
         );
     }
 
     return (
-        <div className="bg-black/20 rounded-xl border border-white/10 overflow-hidden">
+        <div className="bg-white/80 dark:bg-black/20 rounded-xl border border-gray-200 dark:border-white/10 overflow-hidden">
             {/* Header */}
             <div 
-                className="p-6 border-b border-white/10 cursor-pointer hover:bg-white/5 transition-colors"
+                className="p-6 border-b border-gray-200 dark:border-white/10 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
                 onClick={() => setIsExpanded(!isExpanded)}
             >
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2">
-                            <h3 className="text-xl font-bold text-white">Scheduler Status</h3>
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Scheduler Status</h3>
                             <div className={`transform transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}>
-                                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
                             </div>
                         </div>
                         <div className={`flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-medium ${
                             status.running 
-                                ? 'bg-green-900/30 text-green-300 border border-green-500/30'
-                                : 'bg-red-900/30 text-red-300 border border-red-500/30'
+                                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-500/30'
+                                : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-500/30'
                         }`}>
                             <div className={`w-2 h-2 rounded-full ${status.running ? 'bg-green-400' : 'bg-red-400'}`}></div>
                             {status.running ? 'Running' : 'Stopped'}
@@ -179,8 +179,8 @@ export default function SchedulerStatus() {
                 {message && (
                     <div className={`mt-4 p-3 rounded-lg text-sm ${
                         message.type === 'success' 
-                            ? 'bg-green-900/30 text-green-300 border border-green-500/30'
-                            : 'bg-red-900/30 text-red-300 border border-red-500/30'
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-500/30'
+                            : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-500/30'
                     }`}>
                         {message.text}
                     </div>
@@ -192,18 +192,18 @@ export default function SchedulerStatus() {
                 <div className="p-6 space-y-6">
                     {/* Scheduled Jobs */}
                     <div>
-                        <h4 className="text-lg font-semibold text-white mb-4">Scheduled Jobs</h4>
+                        <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Scheduled Jobs</h4>
                         <div className="space-y-3">
                             {status.jobs.map((job) => (
-                                <div key={job.id} className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
+                                <div key={job.id} className="flex items-center justify-between p-4 bg-white/90 dark:bg-white/5 rounded-lg">
                                     <div>
-                                        <div className="font-medium text-white">{job.name}</div>                                </div>
+                                        <div className="font-medium text-gray-900 dark:text-white">{job.name}</div>                                </div>
                                     <div className="text-right">
-                                        <div className="text-sm font-medium text-gray-300">
+                                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                             Next run: {formatNextRun(job.next_run)}
                                         </div>
                                         {job.next_run && (
-                                            <div className="text-xs text-gray-500">
+                                            <div className="text-xs text-gray-600 dark:text-gray-500">
                                                 {formatDateTime(job.next_run)}
                                             </div>
                                         )}
@@ -215,29 +215,29 @@ export default function SchedulerStatus() {
 
                     {/* Last Update Times */}
                     <div>
-                        <h4 className="text-lg font-semibold text-white mb-4">Last Updates</h4>
+                        <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Last Updates</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="p-4 bg-white/5 rounded-lg">
-                                <div className="text-sm text-gray-400">Event Check</div>
-                                <div className="font-medium text-white">
+                            <div className="p-4 bg-white/90 dark:bg-white/5 rounded-lg">
+                                <div className="text-sm text-gray-600 dark:text-gray-400">Event Check</div>
+                                <div className="font-medium text-gray-900 dark:text-white">
                                     {formatDateTime(status.last_event_check)}
                                 </div>
                             </div>
-                            <div className="p-4 bg-white/5 rounded-lg">
-                                <div className="text-sm text-gray-400">Profile Update</div>
-                                <div className="font-medium text-white">
+                            <div className="p-4 bg-white/90 dark:bg-white/5 rounded-lg">
+                                <div className="text-sm text-gray-600 dark:text-gray-400">Profile Update</div>
+                                <div className="font-medium text-gray-900 dark:text-white">
                                     {formatDateTime(status.last_profile_update)}
                                 </div>
                             </div>
-                            <div className="p-4 bg-white/5 rounded-lg">
-                                <div className="text-sm text-gray-400">Result Check</div>
-                                <div className="font-medium text-white">
+                            <div className="p-4 bg-white/90 dark:bg-white/5 rounded-lg">
+                                <div className="text-sm text-gray-600 dark:text-gray-400">Result Check</div>
+                                <div className="font-medium text-gray-900 dark:text-white">
                                     {formatDateTime(status.last_result_check)}
                                 </div>
                             </div>
-                            <div className="p-4 bg-white/5 rounded-lg">
-                                <div className="text-sm text-gray-400">Database Cleanup</div>
-                                <div className="font-medium text-white">
+                            <div className="p-4 bg-white/90 dark:bg-white/5 rounded-lg">
+                                <div className="text-sm text-gray-600 dark:text-gray-400">Database Cleanup</div>
+                                <div className="font-medium text-gray-900 dark:text-white">
                                     {formatDateTime(status.last_cleanup)}
                                 </div>
                             </div>
