@@ -1,7 +1,7 @@
 from src.ml.ml_predict import predict_fight_outcome
 from src.simulate_fight import simulate_fight
 from src.fight_model import calculate_exchange_probabilities
-from src.db import SessionLocal, Fighter
+from src.db import SessionLocal, Fighter, log_prediction
 
 def get_ensemble_prediction(fighter_a: str, fighter_b: str, model_type: str = "ensemble", sim_runs: int = 1000):
     """
@@ -39,6 +39,27 @@ def get_ensemble_prediction(fighter_a: str, fighter_b: str, model_type: str = "e
     else:
         # Weighted average (60% ML, 40% Sim)
         final_prob = 0.6 * ml_prob + 0.4 * sim_prob
+
+    # Determine predicted winner
+    predicted_winner = fighter_a if final_prob > 0.5 else fighter_b
+    
+    # Log prediction to database (for all model types)
+    if model_type in ["ml", "ensemble", "sim"]:
+        diffs = ml_result.get("diffs", {})
+        log_prediction(
+            fighter_a=fighter_a,
+            fighter_b=fighter_b,
+            model=model_type,
+            predicted_winner=predicted_winner,
+            fighter_a_prob=round(final_prob * 100, 1),
+            fighter_b_prob=round((1 - final_prob) * 100, 1),
+            draw_prob=0.0,  # Current models don't predict draws
+            penalty_score=ml_result.get("penalty_score") if model_type != "sim" else None,
+            weight_diff=diffs.get("weight_diff") if model_type != "sim" else None,
+            height_diff=diffs.get("height_diff") if model_type != "sim" else None,
+            reach_diff=diffs.get("reach_diff") if model_type != "sim" else None,
+            age_diff=diffs.get("age_diff") if model_type != "sim" else None
+        )
 
     return {
         "fighter_a": fighter_a,

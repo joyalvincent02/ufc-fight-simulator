@@ -3,10 +3,11 @@
 import requests
 from bs4 import BeautifulSoup
 from sqlalchemy.orm import Session
-from src.db import SessionLocal, Fighter
+from src.db import SessionLocal, Fighter, ModelPrediction, FightResult
 from sqlalchemy import text
 import time
 import re
+from datetime import datetime
 
 # 🧠 Utility to clean and normalize text
 def clean(text):
@@ -65,44 +66,42 @@ def scrape_fighter_outcomes(url: str, fighter_name: str):
 
     return results
 
-# 💾 Save outcomes to database
+# 💾 Save outcomes to database and update predictions
 def save_outcomes(db: Session, outcomes):
     if not outcomes:
         return
 
     fighter_name = outcomes[0]["fighter_name"]
-    db.execute(text("DELETE FROM fight_results WHERE fighter_name = :name"), {"name": fighter_name})
-    db.commit()
-
+    
+    # Save to fight_results table (using existing schema)
     for fight in outcomes:
-        db.execute(text("""
-            INSERT INTO fight_results (
-                fighter_name, opponent_name, result, method, round, time, event, event_date
-            ) VALUES (
-                :fighter_name, :opponent_name, :result, :method, :round, :time, :event, :event_date
-            )
-        """), fight)
+        # Create FightResult (this will be handled by the existing scraping logic)
+        # We don't need to create new FightResult objects since the existing
+        # scraping logic already handles this table
+        
+        # Determine the actual winner for predictions
+        if fight["result"] == "win":
+            actual_winner = fighter_name
+        elif fight["result"] == "loss": 
+            actual_winner = fight["opponent_name"]
+        else:
+            actual_winner = "Draw"
+        
+        # Update any matching predictions
+        predictions = db.query(ModelPrediction).filter(
+            ((ModelPrediction.fighter_a == fighter_name) & (ModelPrediction.fighter_b == fight["opponent_name"])) |
+            ((ModelPrediction.fighter_a == fight["opponent_name"]) & (ModelPrediction.fighter_b == fighter_name))
+        ).all()
+        
+        for pred in predictions:
+            pred.actual_winner = actual_winner
+            pred.correct = (pred.predicted_winner == actual_winner)
+    
     db.commit()
 
 # 🚀 Main loop to scrape all fighters
 def scrape_all_fighters():
     db = SessionLocal()
-
-    # Ensure the fight_results table exists
-    db.execute(text("""
-        CREATE TABLE IF NOT EXISTS fight_results (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            fighter_name TEXT,
-            opponent_name TEXT,
-            result TEXT,
-            method TEXT,
-            round TEXT,
-            time TEXT,
-            event TEXT,
-            event_date TEXT
-        )
-    """))
-    db.commit()
 
     fighters = db.query(Fighter).all()
     for fighter in fighters:
@@ -117,7 +116,7 @@ def scrape_all_fighters():
             print(f"❌ Failed to scrape {fighter.name}: {e}")
 
     db.close()
-    print("✅ Finished scraping all fighters.")
+    print("✅ Finished scraping all fighters and updating predictions.")
 
 if __name__ == "__main__":
     scrape_all_fighters()

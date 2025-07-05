@@ -6,10 +6,11 @@ from src.fight_model import calculate_exchange_probabilities
 from src.simulate_fight import simulate_fight
 from src.ufc_scraper import get_upcoming_event_links, get_fight_card
 from src.fighter_scraper import scrape_fighter_stats, save_fighter_to_db
-from src.db import SessionLocal, Fighter
+from src.db import SessionLocal, Fighter, ModelPrediction, FightResult
 from src.ensemble_predict import get_ensemble_prediction
 from types import SimpleNamespace
 from bs4 import BeautifulSoup
+from sqlalchemy import func
 import requests
 import re
 import json
@@ -275,3 +276,121 @@ def refresh_fighter_images():
     db.commit()
     db.close()
     return {"updated": updated, "skipped": skipped, "total": len(fighters)}
+
+
+@app.get("/model-performance")
+def get_model_performance():
+    """Get overall model performance statistics"""
+    db = SessionLocal()
+    
+    try:
+        # Get all predictions with their results
+        predictions = db.query(ModelPrediction).all()
+        
+        # Calculate overall stats
+        total_predictions = len(predictions)
+        predictions_with_results = [p for p in predictions if p.actual_winner is not None]
+        correct_predictions = [p for p in predictions_with_results if p.correct is True]
+        
+        overall_accuracy = (len(correct_predictions) / len(predictions_with_results) * 100) if predictions_with_results else 0
+        
+        # Break down by model
+        model_breakdown = {}
+        for model in ["ml", "ensemble", "sim"]:
+            model_predictions = [p for p in predictions if p.model == model]
+            model_with_results = [p for p in model_predictions if p.actual_winner is not None]
+            model_correct = [p for p in model_with_results if p.correct is True]
+            
+            model_breakdown[model] = {
+                "total": len(model_predictions),
+                "total_with_results": len(model_with_results),
+                "correct": len(model_correct),
+                "accuracy": round((len(model_correct) / len(model_with_results) * 100), 1) if model_with_results else 0
+            }
+        
+        return {
+            "overall_accuracy": round(overall_accuracy, 1),
+            "total_predictions": total_predictions,
+            "predictions_with_results": len(predictions_with_results),
+            "correct_predictions": len(correct_predictions),
+            "model_breakdown": model_breakdown
+        }
+    
+    finally:
+        db.close()
+
+
+@app.get("/model-performance/detailed")
+def get_detailed_performance():
+    """Get detailed list of all predictions with results"""
+    db = SessionLocal()
+    
+    try:
+        predictions = db.query(ModelPrediction).order_by(ModelPrediction.timestamp.desc()).all()
+        
+        detailed_results = []
+        for pred in predictions:
+            detailed_results.append({
+                "id": pred.id,
+                "fighter_a": pred.fighter_a,
+                "fighter_b": pred.fighter_b,
+                "model": pred.model,
+                "predicted_winner": pred.predicted_winner,
+                "actual_winner": pred.actual_winner,
+                "correct": pred.correct,
+                "fighter_a_prob": pred.fighter_a_prob,
+                "fighter_b_prob": pred.fighter_b_prob,
+                "penalty_score": pred.penalty_score,
+                "timestamp": pred.timestamp.isoformat() if pred.timestamp else None,
+                "has_result": pred.actual_winner is not None
+            })
+        
+        return {
+            "predictions": detailed_results,
+            "total_count": len(detailed_results)
+        }
+    
+    finally:
+        db.close()
+
+
+@app.post("/update-fight-result")
+def update_fight_result(
+    fighter_a: str = Body(...),
+    fighter_b: str = Body(...),
+    actual_winner: str = Body(...),
+    event: str = Body(None)
+):
+    """Update the actual result of a fight and mark predictions as correct/incorrect"""
+    db = SessionLocal()
+    
+    try:
+        # Find matching predictions
+        predictions = db.query(ModelPrediction).filter(
+            ((ModelPrediction.fighter_a == fighter_a) & (ModelPrediction.fighter_b == fighter_b)) |
+            ((ModelPrediction.fighter_a == fighter_b) & (ModelPrediction.fighter_b == fighter_a))
+        ).all()
+        
+        updated_count = 0
+        for pred in predictions:
+            pred.actual_winner = actual_winner
+            pred.correct = (pred.predicted_winner == actual_winner)
+            updated_count += 1
+        
+        # Note: We don't create new FightResult records here since the existing
+        # scraping system handles that table with its own schema
+        
+        db.commit()
+        
+        return {
+            "message": f"Updated {updated_count} predictions",
+            "predictions_updated": updated_count,
+            "result_saved": True
+        }
+    
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e)}
+    
+    finally:
+        db.close()

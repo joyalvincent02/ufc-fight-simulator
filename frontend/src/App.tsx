@@ -6,6 +6,7 @@ import EventsPage from "./pages/EventsPage";
 import SimulatePage from "./pages/SimulatePage";
 import CustomSimPage from "./pages/CustomSimPage";
 import ModelsPage from "./pages/ModelsPage";
+import ResultsPage from "./pages/ResultsPage";
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/simulate/:eventId" element={<SimulatePage />} />
         <Route path="/custom" element={<CustomSimPage />} />
         <Route path="/models" element={<ModelsPage />} />
+        <Route path="/results" element={<ResultsPage />} />
       </Routes>
     </Layout>
   );

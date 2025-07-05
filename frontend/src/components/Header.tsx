@@ -35,6 +35,12 @@ export default function Header() {
           >
             Models
           </Link>
+          <Link
+            to="/results"
+            className="text-white hover:text-red-400 transition"
+          >
+            Results
+          </Link>
         </nav>
       </div>
     </header>
