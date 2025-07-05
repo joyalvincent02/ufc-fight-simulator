@@ -174,7 +174,7 @@ def simulate_full_event(event_id: str, model: str = Query("ensemble", enum=["sim
                         "results": results
                     })
                 else:
-                    results = get_ensemble_prediction(name_a, name_b, model)
+                    results = get_ensemble_prediction(name_a, name_b, model, log_to_db=False)
                     fight_data = {
                         "fighters": [
                             {"name": name_a, "image": f1.image_url},
@@ -233,7 +233,7 @@ def simulate_custom_fight(req: CustomSimRequest):
                 "results": results
             }
         else:
-            ensemble_result = get_ensemble_prediction(name_a, name_b, model)
+            ensemble_result = get_ensemble_prediction(name_a, name_b, model, log_to_db=False)
             # Normalize the response format to match simulation format
             response = {
                 "fighters": [{"name": name_a, "image": f1.image_url}, {"name": name_b, "image": f2.image_url}],

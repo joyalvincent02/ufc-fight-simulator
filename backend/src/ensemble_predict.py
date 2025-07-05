@@ -3,12 +3,19 @@ from src.simulate_fight import simulate_fight
 from src.fight_model import calculate_exchange_probabilities
 from src.db import SessionLocal, Fighter, log_prediction
 
-def get_ensemble_prediction(fighter_a: str, fighter_b: str, model_type: str = "ensemble", sim_runs: int = 1000):
+def get_ensemble_prediction(fighter_a: str, fighter_b: str, model_type: str = "ensemble", sim_runs: int = 1000, log_to_db: bool = True):
     """
-    Returns win probabilities using the selected model type:
-    - "ml" → machine learning model
-    - "sim" → simulation engine
-    - "ensemble" → blended average
+    Get ensemble prediction for two fighters.
+    
+    Args:
+        fighter_a: Name of first fighter
+        fighter_b: Name of second fighter  
+        model_type: Type of model to use ("ml", "ensemble", or "sim")
+        sim_runs: Number of simulation runs for simulation component
+        log_to_db: Whether to log the prediction to the database (True for scheduled/automatic predictions, False for custom simulations)
+    
+    Returns:
+        Dictionary containing prediction results and probabilities
     """
     # Run ML model
     ml_result = predict_fight_outcome(fighter_a, fighter_b)
@@ -43,8 +50,8 @@ def get_ensemble_prediction(fighter_a: str, fighter_b: str, model_type: str = "e
     # Determine predicted winner
     predicted_winner = fighter_a if final_prob > 0.5 else fighter_b
     
-    # Log prediction to database (for all model types)
-    if model_type in ["ml", "ensemble", "sim"]:
+    # Log prediction to database (only if requested)
+    if log_to_db and model_type in ["ml", "ensemble", "sim"]:
         diffs = ml_result.get("diffs", {})
         log_prediction(
             fighter_a=fighter_a,
