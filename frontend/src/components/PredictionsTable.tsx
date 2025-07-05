@@ -17,10 +17,9 @@ interface Prediction {
 
 interface PredictionsTableProps {
     predictions: Prediction[];
-    onUpdateResult?: (prediction: Prediction) => void;
 }
 
-export default function PredictionsTable({ predictions, onUpdateResult }: PredictionsTableProps) {
+export default function PredictionsTable({ predictions }: PredictionsTableProps) {
     const [filter, setFilter] = useState<'all' | 'with_results' | 'pending'>('all');
     const [modelFilter, setModelFilter] = useState<'all' | 'ml' | 'ensemble' | 'sim'>('all');
     const [searchTerm, setSearchTerm] = useState('');
