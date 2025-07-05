@@ -173,7 +173,7 @@ def simulate_full_event(event_id: str, model: str = Query("ensemble", enum=["sim
                     })
                 else:
                     results = get_ensemble_prediction(name_a, name_b, model)
-                    fight_results.append({
+                    fight_data = {
                         "fighters": [
                             {"name": name_a, "image": f1.image_url},
                             {"name": name_b, "image": f2.image_url}
@@ -184,7 +184,15 @@ def simulate_full_event(event_id: str, model: str = Query("ensemble", enum=["sim
                             name_b: results["fighter_b_win_prob"],
                             "Draw": 100.0 - results["fighter_a_win_prob"] - results["fighter_b_win_prob"]
                         }
-                    })
+                    }
+                    
+                    # Add penalty score and diffs for ML and Ensemble models
+                    if "penalty_score" in results:
+                        fight_data["penalty_score"] = results["penalty_score"]
+                    if "diffs" in results:
+                        fight_data["diffs"] = results["diffs"]
+                    
+                    fight_results.append(fight_data)
 
             except Exception as e:
                 fight_results.append({"fighters": [name_a, name_b], "error": str(e)})
@@ -225,7 +233,7 @@ def simulate_custom_fight(req: CustomSimRequest):
         else:
             ensemble_result = get_ensemble_prediction(name_a, name_b, model)
             # Normalize the response format to match simulation format
-            return {
+            response = {
                 "fighters": [{"name": name_a, "image": f1.image_url}, {"name": name_b, "image": f2.image_url}],
                 "model": model,
                 "results": {
@@ -234,6 +242,14 @@ def simulate_custom_fight(req: CustomSimRequest):
                     "Draw": 100.0 - ensemble_result["fighter_a_win_prob"] - ensemble_result["fighter_b_win_prob"]
                 }
             }
+            
+            # Add penalty score and diffs for ML and Ensemble models
+            if "penalty_score" in ensemble_result:
+                response["penalty_score"] = ensemble_result["penalty_score"]
+            if "diffs" in ensemble_result:
+                response["diffs"] = ensemble_result["diffs"]
+            
+            return response
     except Exception as e:
         return {"error": str(e)}
 

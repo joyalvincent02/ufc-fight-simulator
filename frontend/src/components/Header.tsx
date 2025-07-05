@@ -30,10 +30,10 @@ export default function Header() {
             Custom
           </Link>
           <Link
-            to="/model"
+            to="/models"
             className="text-white hover:text-red-400 transition"
           >
-            Model
+            Models
           </Link>
         </nav>
       </div>

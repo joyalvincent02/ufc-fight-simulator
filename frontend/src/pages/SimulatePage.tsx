@@ -19,6 +19,13 @@ type SimFight = {
     P_B: number;
     P_neutral: number;
   };
+  penalty_score?: number;
+  diffs?: {
+    weight_diff: number;
+    height_diff: number;
+    reach_diff: number;
+    age_diff: number;
+  };
   results: {
     [fighter: string]: number;
   };
@@ -62,7 +69,7 @@ export default function SimulatePage() {
       <div className="relative z-10 max-w-4xl mx-auto">
         <h1 className="text-4xl font-bold mb-6 text-center">Simulated Card: {data.event}</h1>
 
- <div className="flex justify-center mb-10">
+        <div className="flex justify-center mb-10">
           <div className="flex items-center gap-4 bg-white/5 px-4 py-2 rounded-lg border border-white/10">
             <label htmlFor="model" className="text-white font-medium whitespace-nowrap">
               Prediction Model
@@ -89,6 +96,10 @@ export default function SimulatePage() {
             const P_A = fight.probabilities?.P_A ?? null;
             const P_B = fight.probabilities?.P_B ?? null;
             const P_neutral = fight.probabilities?.P_neutral ?? null;
+
+            // ML/Ensemble model data
+            const penaltyScore = fight.penalty_score ?? null;
+            const diffs = fight.diffs ?? null;
 
             return (
               <div
@@ -139,6 +150,74 @@ export default function SimulatePage() {
                   <div className="mt-6 text-center text-sm text-gray-300">
                     Neutral Exchanges: {(P_neutral * 100).toFixed(2)}% &nbsp;|&nbsp;
                     Draws: {drawPct.toFixed(1)}%
+                  </div>
+                )}
+
+                {(penaltyScore !== null && diffs && model !== 'sim') && (
+                  <div className="mt-6">
+                    <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 p-4 rounded-lg border border-blue-500/30">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                        <h3 className="font-semibold text-blue-300">
+                          {model === 'ml' ? 'ML Model Analysis' : 'Ensemble Model Analysis'}
+                        </h3>
+                      </div>
+
+                      <div className="flex flex-col md:flex-row gap-4 text-sm">
+                        {/* Mismatch Penalty */}
+                        <div className="flex-1 bg-black/20 p-4 rounded-lg border border-white/10 flex flex-col justify-center items-center text-center">
+                          <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Mismatch Penalty</p>
+                          <p className="text-3xl font-bold text-yellow-400">{(penaltyScore * 100).toFixed(1)}%</p>
+                        </div>
+
+                        {/* Physical Advantages */}
+                        <div className="flex-[2] bg-black/20 p-4 rounded-lg border border-white/10">
+                          <p className="text-gray-400 text-xs uppercase tracking-wide mb-2">Physical Advantages</p>
+                          <div className="grid grid-cols-2 gap-y-3 gap-x-8 text-xs">
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-300">Weight:</span>
+                              <span className="text-white font-medium text-right">
+                                {diffs.weight_diff === 0 ? 'Even' :
+                                  `${diffs.weight_diff > 0 ? A.name : B.name} +${Math.abs(diffs.weight_diff)}lbs`}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-300">Height:</span>
+                              <span className="text-white font-medium text-right">
+                                {diffs.height_diff === 0 ? 'Even' :
+                                  `${diffs.height_diff > 0 ? A.name : B.name} +${Math.abs(diffs.height_diff)}"`}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-300">Reach:</span>
+                              <span className="text-white font-medium text-right">
+                                {diffs.reach_diff === 0 ? 'Even' :
+                                  `${diffs.reach_diff > 0 ? A.name : B.name} +${Math.abs(diffs.reach_diff)}"`}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-300">Age:</span>
+                              <span className="text-white font-medium text-right">
+                                {diffs.age_diff === 0 ? 'Even' :
+                                  `${diffs.age_diff < 0 ? A.name : B.name} ${Math.abs(diffs.age_diff)}yrs younger`}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Model Interpretation */}
+                      <div className="mt-5 pt-4 border-t border-white/10">
+                        <div className="flex items-center gap-2 text-xs text-gray-400">
+                          <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                          <span>
+                            {penaltyScore > 0.3 ? 'High mismatch detected - significant physical differences' :
+                              penaltyScore > 0.15 ? 'Moderate mismatch - notable physical differences' :
+                                'Low mismatch - similar physical attributes'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
