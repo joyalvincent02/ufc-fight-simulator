@@ -36,35 +36,7 @@ export default function PerformanceStats({ stats }: PerformanceStatsProps) {
 
     return (
         <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                {/* Overall Accuracy */}
-                <div className="bg-gradient-to-br from-blue-900/30 to-purple-900/30 p-6 rounded-xl border border-blue-500/30">
-                    <div className="flex items-center gap-2 mb-2">
-                        <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                        <h3 className="text-sm font-medium text-blue-300">Overall Accuracy</h3>
-                    </div>
-                    <div className={`text-3xl font-bold ${getAccuracyColor(stats.overall_accuracy)}`}>
-                        {stats.overall_accuracy.toFixed(1)}%
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1">
-                        {stats.correct_predictions} of {stats.predictions_with_results} correct
-                    </p>
-                </div>
-
-                {/* Total Predictions */}
-                <div className="bg-gradient-to-br from-green-900/30 to-blue-900/30 p-6 rounded-xl border border-green-500/30">
-                    <div className="flex items-center gap-2 mb-2">
-                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                        <h3 className="text-sm font-medium text-green-300">Total Predictions</h3>
-                    </div>
-                    <div className="text-3xl font-bold text-green-400">
-                        {stats.total_predictions}
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1">
-                        {stats.predictions_with_results} with results
-                    </p>
-                </div>
-
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 {/* ML Model */}
                 <div className="bg-gradient-to-br from-purple-900/30 to-pink-900/30 p-6 rounded-xl border border-purple-500/30">
                     <div className="flex items-center gap-2 mb-2">
@@ -92,10 +64,7 @@ export default function PerformanceStats({ stats }: PerformanceStatsProps) {
                         {stats.model_breakdown.ensemble.correct} of {stats.model_breakdown.ensemble.total_with_results} correct
                     </p>
                 </div>
-            </div>
 
-            {/* Second Row - Simulation Model gets its own section */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 {/* Simulation Model */}
                 <div className="bg-gradient-to-br from-cyan-900/30 to-blue-900/30 p-6 rounded-xl border border-cyan-500/30">
                     <div className="flex items-center gap-2 mb-2">
@@ -109,9 +78,34 @@ export default function PerformanceStats({ stats }: PerformanceStatsProps) {
                         {stats.model_breakdown.sim.correct} of {stats.model_breakdown.sim.total_with_results} correct
                     </p>
                 </div>
+            </div>
+
+            {/* Second Row - Model Summary and Total Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                {/* Total Predictions Summary */}
+                <div className="bg-gradient-to-br from-green-900/30 to-blue-900/30 p-6 rounded-xl border border-green-500/30">
+                    <div className="flex items-center gap-2 mb-4">
+                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                        <h3 className="text-sm font-medium text-green-300">Total Predictions</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 text-center">
+                        <div>
+                            <div className="text-2xl font-bold text-green-400">
+                                {stats.total_predictions}
+                            </div>
+                            <div className="text-xs text-gray-400">Total Predictions</div>
+                        </div>
+                        <div>
+                            <div className="text-2xl font-bold text-blue-400">
+                                {stats.predictions_with_results}
+                            </div>
+                            <div className="text-xs text-gray-400">With Results</div>
+                        </div>
+                    </div>
+                </div>
 
                 {/* Model Comparison Summary */}
-                <div className="md:col-span-2 bg-gradient-to-br from-gray-900/30 to-slate-900/30 p-6 rounded-xl border border-gray-500/30">
+                <div className="bg-gradient-to-br from-gray-900/30 to-slate-900/30 p-6 rounded-xl border border-gray-500/30">
                     <div className="flex items-center gap-2 mb-4">
                         <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
                         <h3 className="text-sm font-medium text-gray-300">Model Summary</h3>

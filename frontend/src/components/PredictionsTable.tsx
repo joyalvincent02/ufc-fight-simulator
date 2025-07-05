@@ -41,6 +41,24 @@ export default function PredictionsTable({ predictions, onUpdateResult }: Predic
             (pred.actual_winner && pred.actual_winner.toLowerCase().includes(searchTerm.toLowerCase()));
         
         return matchesFilter && matchesModel && matchesSearch;
+    }).sort((a, b) => {
+        // First sort by fight name (to group same fights together)
+        const fightA = `${a.fighter_a} vs ${a.fighter_b}`;
+        const fightB = `${b.fighter_a} vs ${b.fighter_b}`;
+        
+        if (fightA !== fightB) {
+            // For different fights, sort by timestamp (most recent first)
+            const dateA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+            const dateB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+            return dateB - dateA;
+        }
+        
+        // For the same fight, sort by model in the order: ensemble, ml, sim
+        const modelOrder: { [key: string]: number } = { ensemble: 1, ml: 2, sim: 3 };
+        const orderA = modelOrder[a.model.toLowerCase()] || 4;
+        const orderB = modelOrder[b.model.toLowerCase()] || 4;
+        
+        return orderA - orderB;
     });
 
     // Pagination logic
@@ -76,7 +94,8 @@ export default function PredictionsTable({ predictions, onUpdateResult }: Predic
             month: 'short',
             day: 'numeric',
             hour: '2-digit',
-            minute: '2-digit'
+            minute: '2-digit',
+            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
         });
     };
 
@@ -236,7 +255,7 @@ export default function PredictionsTable({ predictions, onUpdateResult }: Predic
                             <th className="text-left p-4 text-sm font-medium text-gray-300">Confidence</th>
                             <th className="text-left p-4 text-sm font-medium text-gray-300">Actual</th>
                             <th className="text-left p-4 text-sm font-medium text-gray-300">Result</th>
-                            <th className="text-left p-4 text-sm font-medium text-gray-300">Date</th>
+                            <th className="text-left p-4 text-sm font-medium text-gray-300">Predicted On</th>
                         </tr>
                     </thead>
                     <tbody>
