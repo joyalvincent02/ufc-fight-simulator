@@ -1,5 +1,0 @@
-from src.db import SessionLocal, Fighter
-db = SessionLocal()
-fighters = db.query(Fighter.name).all()
-db.close()
-print([f[0] for f in fighters])

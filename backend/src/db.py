@@ -98,11 +98,23 @@ def log_prediction(
     weight_diff: int = None,
     height_diff: int = None,
     reach_diff: int = None,
-    age_diff: int = None
+    age_diff: int = None,
+    allow_duplicates: bool = False
 ):
-    """Log a model prediction to the database"""
+    """Log a model prediction to the database with duplicate prevention"""
     db = SessionLocal()
     try:
+        # Check for existing prediction unless duplicates are explicitly allowed
+        if not allow_duplicates:
+            existing = db.query(ModelPrediction).filter(
+                ((ModelPrediction.fighter_a == fighter_a) & (ModelPrediction.fighter_b == fighter_b) & (ModelPrediction.model == model)) |
+                ((ModelPrediction.fighter_a == fighter_b) & (ModelPrediction.fighter_b == fighter_a) & (ModelPrediction.model == model))
+            ).first()
+            
+            if existing:
+                print(f"Prediction already exists for {fighter_a} vs {fighter_b} ({model}), skipping...")
+                return existing.id
+        
         prediction = ModelPrediction(
             fighter_a=fighter_a,
             fighter_b=fighter_b,
