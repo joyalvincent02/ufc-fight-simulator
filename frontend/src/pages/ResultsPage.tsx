@@ -23,6 +23,12 @@ interface ModelPerformance {
             correct: number;
             accuracy: number;
         };
+        sim: {
+            total: number;
+            total_with_results: number;
+            correct: number;
+            accuracy: number;
+        };
     };
 }
 
@@ -114,7 +120,7 @@ export default function ResultsPage() {
                 <div className="flex items-center justify-between mb-8">
                     <div>
                         <p className="text-gray-400">
-                            Track accuracy and performance of ML and Ensemble prediction models
+                            Track accuracy and performance of ML, Ensemble, and Simulation prediction models
                         </p>
                     </div>
                     <button
@@ -172,6 +178,20 @@ export default function ResultsPage() {
                                     </div>
                                     <span className="text-white font-medium w-12">
                                         {performance?.model_breakdown.ensemble.accuracy.toFixed(1)}%
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-cyan-300">Simulation Model</span>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-32 bg-white/10 rounded-full h-2">
+                                        <div 
+                                            className="bg-cyan-500 h-2 rounded-full"
+                                            style={{ width: `${performance?.model_breakdown.sim.accuracy || 0}%` }}
+                                        />
+                                    </div>
+                                    <span className="text-white font-medium w-12">
+                                        {performance?.model_breakdown.sim.accuracy.toFixed(1)}%
                                     </span>
                                 </div>
                             </div>

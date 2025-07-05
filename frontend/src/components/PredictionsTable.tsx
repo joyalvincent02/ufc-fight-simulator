@@ -23,6 +23,9 @@ interface PredictionsTableProps {
 export default function PredictionsTable({ predictions, onUpdateResult }: PredictionsTableProps) {
     const [filter, setFilter] = useState<'all' | 'with_results' | 'pending'>('all');
     const [modelFilter, setModelFilter] = useState<'all' | 'ml' | 'ensemble' | 'sim'>('all');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
 
     const filteredPredictions = predictions.filter(pred => {
         const matchesFilter = filter === 'all' || 
@@ -31,8 +34,25 @@ export default function PredictionsTable({ predictions, onUpdateResult }: Predic
         
         const matchesModel = modelFilter === 'all' || pred.model === modelFilter;
         
-        return matchesFilter && matchesModel;
+        const matchesSearch = searchTerm === '' || 
+            pred.fighter_a.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            pred.fighter_b.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            pred.predicted_winner.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (pred.actual_winner && pred.actual_winner.toLowerCase().includes(searchTerm.toLowerCase()));
+        
+        return matchesFilter && matchesModel && matchesSearch;
     });
+
+    // Pagination logic
+    const totalPages = Math.ceil(filteredPredictions.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedPredictions = filteredPredictions.slice(startIndex, endIndex);
+
+    // Reset to first page when filters change
+    const resetToFirstPage = () => {
+        setCurrentPage(1);
+    };
 
     const getModelBadge = (model: string) => {
         const colors = {
@@ -62,82 +82,146 @@ export default function PredictionsTable({ predictions, onUpdateResult }: Predic
 
     return (
         <div className="bg-black/20 rounded-xl border border-white/10 overflow-hidden">
-            {/* Filters */}
-            <div className="p-4 border-b border-white/10 flex flex-wrap gap-4">
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => setFilter('all')}
-                        className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                            filter === 'all' 
-                                ? 'bg-blue-600 text-white' 
-                                : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                        }`}
-                    >
-                        All ({predictions.length})
-                    </button>
-                    <button
-                        onClick={() => setFilter('with_results')}
-                        className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                            filter === 'with_results' 
-                                ? 'bg-blue-600 text-white' 
-                                : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                        }`}
-                    >
-                        With Results ({predictions.filter(p => p.has_result).length})
-                    </button>
-                    <button
-                        onClick={() => setFilter('pending')}
-                        className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                            filter === 'pending' 
-                                ? 'bg-blue-600 text-white' 
-                                : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                        }`}
-                    >
-                        Pending ({predictions.filter(p => !p.has_result).length})
-                    </button>
+            {/* Search and Controls */}
+            <div className="p-4 border-b border-white/10">
+                <div className="flex flex-col sm:flex-row gap-4 mb-4">
+                    {/* Search Input */}
+                    <div className="flex-1">
+                        <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="Search fighters, winners, or predictions..."
+                                value={searchTerm}
+                                onChange={(e) => {
+                                    setSearchTerm(e.target.value);
+                                    resetToFirstPage();
+                                }}
+                                className="w-full px-4 py-2 pl-10 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            />
+                            <div className="absolute left-3 top-2.5 text-gray-400">
+                                🔍
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Items per page */}
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-300">Show:</span>
+                        <select
+                            value={itemsPerPage}
+                            onChange={(e) => {
+                                setItemsPerPage(Number(e.target.value));
+                                resetToFirstPage();
+                            }}
+                            className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        >
+                            <option value={10}>10</option>
+                            <option value={25}>25</option>
+                            <option value={50}>50</option>
+                            <option value={100}>100</option>
+                        </select>
+                        <span className="text-sm text-gray-300">per page</span>
+                    </div>
                 </div>
-                
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => setModelFilter('all')}
-                        className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                            modelFilter === 'all' 
-                                ? 'bg-purple-600 text-white' 
-                                : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                        }`}
-                    >
-                        All Models
-                    </button>
-                    <button
-                        onClick={() => setModelFilter('ml')}
-                        className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                            modelFilter === 'ml' 
-                                ? 'bg-purple-600 text-white' 
-                                : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                        }`}
-                    >
-                        ML Only
-                    </button>
-                    <button
-                        onClick={() => setModelFilter('ensemble')}
-                        className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                            modelFilter === 'ensemble' 
-                                ? 'bg-purple-600 text-white' 
-                                : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                        }`}
-                    >
-                        Ensemble Only
-                    </button>
-                    <button
-                        onClick={() => setModelFilter('sim')}
-                        className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                            modelFilter === 'sim' 
-                                ? 'bg-purple-600 text-white' 
-                                : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                        }`}
-                    >
-                        Simulation Only
-                    </button>
+
+                {/* Filters */}
+                <div className="flex flex-wrap gap-4">
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => {
+                                setFilter('all');
+                                resetToFirstPage();
+                            }}
+                            className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                                filter === 'all' 
+                                    ? 'bg-blue-600 text-white' 
+                                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                            }`}
+                        >
+                            All ({predictions.length})
+                        </button>
+                        <button
+                            onClick={() => {
+                                setFilter('with_results');
+                                resetToFirstPage();
+                            }}
+                            className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                                filter === 'with_results' 
+                                    ? 'bg-blue-600 text-white' 
+                                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                            }`}
+                        >
+                            With Results ({predictions.filter(p => p.has_result).length})
+                        </button>
+                        <button
+                            onClick={() => {
+                                setFilter('pending');
+                                resetToFirstPage();
+                            }}
+                            className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                                filter === 'pending' 
+                                    ? 'bg-blue-600 text-white' 
+                                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                            }`}
+                        >
+                            Pending ({predictions.filter(p => !p.has_result).length})
+                        </button>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => {
+                                setModelFilter('all');
+                                resetToFirstPage();
+                            }}
+                            className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                                modelFilter === 'all' 
+                                    ? 'bg-purple-600 text-white' 
+                                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                            }`}
+                        >
+                            All Models
+                        </button>
+                        <button
+                            onClick={() => {
+                                setModelFilter('ml');
+                                resetToFirstPage();
+                            }}
+                            className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                                modelFilter === 'ml' 
+                                    ? 'bg-purple-600 text-white' 
+                                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                            }`}
+                        >
+                            ML Only
+                        </button>
+                        <button
+                            onClick={() => {
+                                setModelFilter('ensemble');
+                                resetToFirstPage();
+                            }}
+                            className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                                modelFilter === 'ensemble' 
+                                    ? 'bg-purple-600 text-white' 
+                                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                            }`}
+                        >
+                            Ensemble Only
+                        </button>
+                        <button
+                            onClick={() => {
+                                setModelFilter('sim');
+                                resetToFirstPage();
+                            }}
+                            className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                                modelFilter === 'sim' 
+                                    ? 'bg-purple-600 text-white' 
+                                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                            }`}
+                        >
+                            Simulation Only
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -156,7 +240,7 @@ export default function PredictionsTable({ predictions, onUpdateResult }: Predic
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredPredictions.map((prediction) => (
+                        {paginatedPredictions.map((prediction) => (
                             <tr key={prediction.id} className="border-b border-white/5 hover:bg-white/5">
                                 <td className="p-4">
                                     <div className="text-sm font-medium text-white">
@@ -203,9 +287,91 @@ export default function PredictionsTable({ predictions, onUpdateResult }: Predic
                 </table>
             </div>
 
+            {/* Pagination */}
+            {filteredPredictions.length > 0 && (
+                <div className="p-4 border-t border-white/10">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                        {/* Results Info */}
+                        <div className="text-sm text-gray-400">
+                            Showing {startIndex + 1} to {Math.min(endIndex, filteredPredictions.length)} of {filteredPredictions.length} results
+                            {searchTerm && ` for "${searchTerm}"`}
+                        </div>
+
+                        {/* Pagination Controls */}
+                        {totalPages > 1 && (
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setCurrentPage(1)}
+                                    disabled={currentPage === 1}
+                                    className="px-3 py-1 rounded-lg text-sm bg-white/10 text-gray-300 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    First
+                                </button>
+                                <button
+                                    onClick={() => setCurrentPage(currentPage - 1)}
+                                    disabled={currentPage === 1}
+                                    className="px-3 py-1 rounded-lg text-sm bg-white/10 text-gray-300 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    Previous
+                                </button>
+                                
+                                {/* Page Numbers */}
+                                <div className="flex gap-1">
+                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                        let pageNum;
+                                        if (totalPages <= 5) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage <= 3) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage >= totalPages - 2) {
+                                            pageNum = totalPages - 4 + i;
+                                        } else {
+                                            pageNum = currentPage - 2 + i;
+                                        }
+                                        
+                                        return (
+                                            <button
+                                                key={pageNum}
+                                                onClick={() => setCurrentPage(pageNum)}
+                                                className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                                                    currentPage === pageNum
+                                                        ? 'bg-purple-600 text-white'
+                                                        : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                                                }`}
+                                            >
+                                                {pageNum}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                
+                                <button
+                                    onClick={() => setCurrentPage(currentPage + 1)}
+                                    disabled={currentPage === totalPages}
+                                    className="px-3 py-1 rounded-lg text-sm bg-white/10 text-gray-300 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    Next
+                                </button>
+                                <button
+                                    onClick={() => setCurrentPage(totalPages)}
+                                    disabled={currentPage === totalPages}
+                                    className="px-3 py-1 rounded-lg text-sm bg-white/10 text-gray-300 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    Last
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Empty State */}
             {filteredPredictions.length === 0 && (
                 <div className="p-8 text-center text-gray-400">
-                    No predictions found matching the selected filters.
+                    {searchTerm ? 
+                        `No predictions found matching "${searchTerm}".` :
+                        "No predictions found matching the selected filters."
+                    }
                 </div>
             )}
         </div>
