@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { simulateEvent } from "../services/api";
 import Spinner from "../components/Spinner";
 import FighterCard from "../components/FighterCard";
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 
 const winnerColor = "#015a3c";
 const loserColor = "#ca2320";
@@ -217,8 +218,9 @@ export default function SimulatePage() {
                 )}
 
                 {fight.error && (
-                  <div className="mt-4 text-center text-red-600 dark:text-red-400 font-medium">
-                    ⚠️ {fight.error}
+                  <div className="mt-4 text-center text-red-600 dark:text-red-400 font-medium flex items-center justify-center gap-2">
+                    <WarningAmberIcon sx={{ fontSize: 16 }} />
+                    {fight.error}
                   </div>
                 )}
               </div>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import SearchIcon from '@mui/icons-material/Search';
 
 interface Prediction {
     id: number;
@@ -108,7 +109,7 @@ export default function PredictionsTable({ predictions }: PredictionsTableProps)
                         <div className="relative">
                             <input
                                 type="text"
-                                placeholder="Search fighters, winners, or predictions..."
+                                placeholder="Search fighters or predictions..."
                                 value={searchTerm}
                                 onChange={(e) => {
                                     setSearchTerm(e.target.value);
@@ -116,29 +117,30 @@ export default function PredictionsTable({ predictions }: PredictionsTableProps)
                                 }}
                                 className="w-full px-4 py-2 pl-10 bg-white/90 dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
                             />
-                            <div className="absolute left-3 top-2.5 text-gray-500 dark:text-gray-400">
-                                🔍
+                            <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400">
+                                <SearchIcon sx={{ fontSize: 16 }} />
                             </div>
                         </div>
                     </div>
 
                     {/* Items per page */}
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-700 dark:text-gray-300">Show:</span>
+                    <div className="flex items-center gap-2 text-sm">
+                        <span className="text-gray-700 dark:text-gray-300 hidden sm:inline">Show:</span>
                         <select
                             value={itemsPerPage}
                             onChange={(e) => {
                                 setItemsPerPage(Number(e.target.value));
                                 resetToFirstPage();
                             }}
-                            className="px-3 py-2 bg-white/90 dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            className="px-2 sm:px-3 py-2 bg-white/90 dark:bg-white/10 border border-gray-300 dark:border-white/20 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                         >
                             <option value={10}>10</option>
                             <option value={25}>25</option>
                             <option value={50}>50</option>
                             <option value={100}>100</option>
                         </select>
-                        <span className="text-sm text-gray-700 dark:text-gray-300">per page</span>
+                        <span className="text-gray-700 dark:text-gray-300 hidden sm:inline">per page</span>
+                        <span className="text-gray-700 dark:text-gray-300 sm:hidden">/ page</span>
                     </div>
                 </div>
 
@@ -243,8 +245,8 @@ export default function PredictionsTable({ predictions }: PredictionsTableProps)
                 </div>
             </div>
 
-            {/* Table */}
-            <div className="overflow-x-auto">
+            {/* Desktop Table - Hidden on mobile */}
+            <div className="hidden md:block overflow-x-auto">
                 <table className="w-full">
                     <thead>
                         <tr className="bg-gray-50 dark:bg-white/5">
@@ -305,78 +307,162 @@ export default function PredictionsTable({ predictions }: PredictionsTableProps)
                 </table>
             </div>
 
+            {/* Mobile Cards - Shown only on mobile */}
+            <div className="md:hidden space-y-3 p-4">
+                {paginatedPredictions.map((prediction) => (
+                    <div key={prediction.id} className="bg-white/60 dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10 p-4 hover:bg-white/80 dark:hover:bg-white/10 transition-colors">
+                        {/* Fight Header */}
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                            <h3 className="font-medium text-gray-900 dark:text-white text-sm">
+                                {prediction.fighter_a} vs {prediction.fighter_b}
+                            </h3>
+                            <div className="flex items-center gap-2">
+                                <span className={`px-2 py-1 rounded-lg text-xs font-medium border ${getModelBadge(prediction.model)}`}>
+                                    {prediction.model.toUpperCase()}
+                                </span>
+                                <span className={`px-2 py-1 rounded-lg text-xs font-medium border ${getResultBadge(prediction.correct, prediction.has_result)}`}>
+                                    {!prediction.has_result ? 'Pending' : 
+                                     prediction.correct ? 'Correct' : 'Incorrect'}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Prediction Details */}
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                                <span className="text-gray-600 dark:text-gray-400 block text-xs">Predicted Winner</span>
+                                <span className="text-gray-900 dark:text-white font-medium">
+                                    {prediction.predicted_winner}
+                                </span>
+                            </div>
+                            <div>
+                                <span className="text-gray-600 dark:text-gray-400 block text-xs">Confidence</span>
+                                <span className="text-gray-700 dark:text-gray-300">
+                                    {prediction.fighter_a_prob && prediction.fighter_b_prob 
+                                        ? `${Math.max(prediction.fighter_a_prob, prediction.fighter_b_prob).toFixed(1)}%`
+                                        : 'N/A'
+                                    }
+                                </span>
+                            </div>
+                            <div>
+                                <span className="text-gray-600 dark:text-gray-400 block text-xs">Actual Winner</span>
+                                <span className="text-gray-700 dark:text-gray-300">
+                                    {prediction.actual_winner || 'Pending'}
+                                </span>
+                            </div>
+                            <div>
+                                <span className="text-gray-600 dark:text-gray-400 block text-xs">Predicted On</span>
+                                <span className="text-gray-600 dark:text-gray-400 text-xs">
+                                    {formatDate(prediction.timestamp)}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
             {/* Pagination */}
             {filteredPredictions.length > 0 && (
                 <div className="p-4 border-t border-gray-200 dark:border-white/10">
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                         {/* Results Info */}
-                        <div className="text-sm text-gray-600 dark:text-gray-400">
-                            Showing {startIndex + 1} to {Math.min(endIndex, filteredPredictions.length)} of {filteredPredictions.length} results
-                            {searchTerm && ` for "${searchTerm}"`}
+                        <div className="text-sm text-gray-600 dark:text-gray-400 text-center sm:text-left">
+                            <span className="block sm:inline">
+                                Showing {startIndex + 1} to {Math.min(endIndex, filteredPredictions.length)} of {filteredPredictions.length} results
+                            </span>
+                            {searchTerm && (
+                                <span className="block sm:inline sm:ml-1">
+                                    for "{searchTerm}"
+                                </span>
+                            )}
                         </div>
 
                         {/* Pagination Controls */}
                         {totalPages > 1 && (
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => setCurrentPage(1)}
-                                    disabled={currentPage === 1}
-                                    className="px-3 py-1 rounded-lg text-sm bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    First
-                                </button>
-                                <button
-                                    onClick={() => setCurrentPage(currentPage - 1)}
-                                    disabled={currentPage === 1}
-                                    className="px-3 py-1 rounded-lg text-sm bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    Previous
-                                </button>
-                                
-                                {/* Page Numbers */}
-                                <div className="flex gap-1">
-                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                        let pageNum;
-                                        if (totalPages <= 5) {
-                                            pageNum = i + 1;
-                                        } else if (currentPage <= 3) {
-                                            pageNum = i + 1;
-                                        } else if (currentPage >= totalPages - 2) {
-                                            pageNum = totalPages - 4 + i;
-                                        } else {
-                                            pageNum = currentPage - 2 + i;
-                                        }
-                                        
-                                        return (
-                                            <button
-                                                key={pageNum}
-                                                onClick={() => setCurrentPage(pageNum)}
-                                                className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                                                    currentPage === pageNum
-                                                        ? 'bg-purple-600 text-white'
-                                                        : 'bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-white/20'
-                                                }`}
-                                            >
-                                                {pageNum}
-                                            </button>
-                                        );
-                                    })}
+                            <div className="flex items-center gap-1 sm:gap-2">
+                                {/* Mobile: Show only essential controls */}
+                                <div className="flex items-center gap-1 sm:hidden">
+                                    <button
+                                        onClick={() => setCurrentPage(currentPage - 1)}
+                                        disabled={currentPage === 1}
+                                        className="px-2 py-1 rounded-lg text-sm bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        Prev
+                                    </button>
+                                    <span className="px-2 py-1 text-sm text-gray-700 dark:text-gray-300">
+                                        {currentPage} / {totalPages}
+                                    </span>
+                                    <button
+                                        onClick={() => setCurrentPage(currentPage + 1)}
+                                        disabled={currentPage === totalPages}
+                                        className="px-2 py-1 rounded-lg text-sm bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        Next
+                                    </button>
                                 </div>
-                                
-                                <button
-                                    onClick={() => setCurrentPage(currentPage + 1)}
-                                    disabled={currentPage === totalPages}
-                                    className="px-3 py-1 rounded-lg text-sm bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    Next
-                                </button>
-                                <button
-                                    onClick={() => setCurrentPage(totalPages)}
-                                    disabled={currentPage === totalPages}
-                                    className="px-3 py-1 rounded-lg text-sm bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    Last
-                                </button>
+
+                                {/* Desktop: Show full controls */}
+                                <div className="hidden sm:flex items-center gap-2">
+                                    <button
+                                        onClick={() => setCurrentPage(1)}
+                                        disabled={currentPage === 1}
+                                        className="px-3 py-1 rounded-lg text-sm bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        First
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentPage(currentPage - 1)}
+                                        disabled={currentPage === 1}
+                                        className="px-3 py-1 rounded-lg text-sm bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        Previous
+                                    </button>
+                                    
+                                    {/* Page Numbers */}
+                                    <div className="flex gap-1">
+                                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                            let pageNum;
+                                            if (totalPages <= 5) {
+                                                pageNum = i + 1;
+                                            } else if (currentPage <= 3) {
+                                                pageNum = i + 1;
+                                            } else if (currentPage >= totalPages - 2) {
+                                                pageNum = totalPages - 4 + i;
+                                            } else {
+                                                pageNum = currentPage - 2 + i;
+                                            }
+                                            
+                                            return (
+                                                <button
+                                                    key={pageNum}
+                                                    onClick={() => setCurrentPage(pageNum)}
+                                                    className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                                                        currentPage === pageNum
+                                                            ? 'bg-purple-600 text-white'
+                                                            : 'bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-white/20'
+                                                    }`}
+                                                >
+                                                    {pageNum}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    
+                                    <button
+                                        onClick={() => setCurrentPage(currentPage + 1)}
+                                        disabled={currentPage === totalPages}
+                                        className="px-3 py-1 rounded-lg text-sm bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        Next
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentPage(totalPages)}
+                                        disabled={currentPage === totalPages}
+                                        className="px-3 py-1 rounded-lg text-sm bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        Last
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>

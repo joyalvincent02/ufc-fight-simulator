@@ -5,6 +5,12 @@ import PredictionsTable from "../components/PredictionsTable";
 import SchedulerStatus from "../components/SchedulerStatus";
 import PageLayout from "../components/PageLayout";
 import Spinner from "../components/Spinner";
+import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import GpsFixedIcon from '@mui/icons-material/GpsFixed';
+import TableChartIcon from '@mui/icons-material/TableChart';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 
 interface ModelPerformance {
     overall_accuracy: number;
@@ -101,7 +107,10 @@ export default function ResultsPage() {
         return (
             <PageLayout title="Model Performance Results">
                 <div className="text-center py-12">
-                    <div className="text-red-600 dark:text-red-400 mb-4">❌ Error loading results</div>
+                    <div className="text-red-600 dark:text-red-400 mb-4 flex items-center justify-center gap-2">
+                        <ErrorOutlineIcon />
+                        Error loading results
+                    </div>
                     <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
                     <button
                         onClick={handleRefresh}
@@ -118,16 +127,16 @@ export default function ResultsPage() {
         <PageLayout title="Model Performance Results">
             <div className="max-w-7xl mx-auto px-4 py-8">
                 {/* Header */}
-                <div className="flex items-center justify-between mb-8">
-                    <div>
-                        <p className="text-gray-600 dark:text-gray-400">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+                    <div className="flex-1">
+                        <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">
                             Track accuracy and performance of ML, Ensemble, and Simulation prediction models
                         </p>
                     </div>
                     <button
                         onClick={handleRefresh}
                         disabled={refreshing}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 self-start sm:self-auto"
                     >
                         {refreshing ? (
                             <>
@@ -136,7 +145,8 @@ export default function ResultsPage() {
                             </>
                         ) : (
                             <>
-                                🔄 Refresh
+                                <RefreshOutlinedIcon sx={{ fontSize: 20 }} />
+                                Refresh
                             </>
                         )}
                     </button>
@@ -155,8 +165,9 @@ export default function ResultsPage() {
                 {/* Model Comparison */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                     <div className="bg-white/80 dark:bg-black/20 rounded-xl border border-gray-200 dark:border-white/10 p-6">
-                        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                            📊 Model Comparison
+                        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                            <BarChartIcon />
+                            Model Comparison
                         </h3>
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
@@ -205,8 +216,9 @@ export default function ResultsPage() {
                     </div>
 
                     <div className="bg-white/80 dark:bg-black/20 rounded-xl border border-gray-200 dark:border-white/10 p-6">
-                        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                            🎯 Quick Stats
+                        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                            <GpsFixedIcon />
+                            Quick Stats
                         </h3>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="text-center">
@@ -242,8 +254,9 @@ export default function ResultsPage() {
 
                 {/* Detailed Predictions Table */}
                 <div className="mb-8">
-                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                        📋 Detailed Predictions
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                        <TableChartIcon />
+                        Detailed Predictions
                     </h3>
                     {detailedData && (
                         <PredictionsTable predictions={detailedData.predictions} />
@@ -252,8 +265,9 @@ export default function ResultsPage() {
 
                 {/* Info Section */}
                 <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl border border-blue-200 dark:border-blue-500/30 p-6">
-                    <h3 className="text-lg font-semibold text-blue-700 dark:text-blue-300 mb-2">
-                        📝 About Model Performance Tracking
+                    <h3 className="text-lg font-semibold text-blue-700 dark:text-blue-300 mb-2 flex items-center gap-2">
+                        <InfoOutlinedIcon />
+                        About Model Performance Tracking
                     </h3>
                     <div className="text-gray-700 dark:text-gray-300 space-y-2">
                         <p>

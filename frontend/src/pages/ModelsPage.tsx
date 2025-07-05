@@ -236,18 +236,20 @@ export default function ModelPage() {
           </InfoBox>
 
         <div className="text-center mt-10">
-          <Link
-            to="/custom"
-            className="text-red-400 hover:underline font-medium text-base mr-6"
-          >
-            Try Custom Simulation →
-          </Link>
-          <Link
-            to="/events"
-            className="text-red-400 hover:underline font-medium text-base"
-          >
-            Simulate UFC Events →
-          </Link>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
+            <Link
+              to="/custom"
+              className="text-red-400 hover:underline font-medium text-base"
+            >
+              Try Custom Simulation →
+            </Link>
+            <Link
+              to="/events"
+              className="text-red-400 hover:underline font-medium text-base"
+            >
+              Simulate UFC Events →
+            </Link>
+          </div>
         </div>
       </section>
       </div>

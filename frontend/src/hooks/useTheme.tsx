@@ -16,7 +16,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return savedTheme || 'system';
   });
 
-  const [effectiveTheme, setEffectiveTheme] = useState<'light' | 'dark'>('dark');
+  const [effectiveTheme, setEffectiveTheme] = useState<'light' | 'dark'>(() => {
+    // Initialize with system preference
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
 
   useEffect(() => {
     const updateEffectiveTheme = () => {
