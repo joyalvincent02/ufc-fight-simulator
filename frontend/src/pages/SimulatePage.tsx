@@ -2,6 +2,7 @@ import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { simulateEvent } from "../services/api";
 import Spinner from "../components/Spinner";
+import FighterCard from "../components/FighterCard";
 
 const winnerColor = "#015a3c";
 const loserColor = "#ca2320";
@@ -36,9 +37,6 @@ type SimData = {
   event: string;
   fights: SimFight[];
 };
-
-const FALLBACK_IMAGE =
-  "https://www.ufc.com/themes/custom/ufc/assets/img/no-profile-image.png";
 
 export default function SimulatePage() {
   const { eventId } = useParams();
@@ -125,23 +123,15 @@ export default function SimulatePage() {
                     }
 
                     return (
-                      <div key={idx} className="flex flex-col items-center text-center">
-                        <img
-                          src={f.image || FALLBACK_IMAGE}
-                          alt={f.name}
-                          style={{ borderColor }}
-                          className="w-24 h-24 rounded-full object-cover border-4 mb-3"
-                        />
-                        <p className="text-lg font-bold">{f.name}</p>
-                        <p className="text-sm text-gray-300">
-                          Win %: {winPct.toFixed(1)}%
-                        </p>
-                        {(P_A !== null && P_B !== null) && (
-                          <p className="text-sm text-gray-400">
-                            Exchange Chance: {(((idx === 0 ? P_A : P_B) ?? 0) * 100).toFixed(2)}%
-                          </p>
-                        )}
-                      </div>
+                      <FighterCard
+                        key={idx}
+                        name={f.name}
+                        image={f.image}
+                        winPercentage={winPct}
+                        exchangeChance={idx === 0 ? P_A ?? undefined : P_B ?? undefined}
+                        borderColor={borderColor}
+                        showExchangeChance={P_A !== null && P_B !== null}
+                      />
                     );
                   })}
                 </div>
