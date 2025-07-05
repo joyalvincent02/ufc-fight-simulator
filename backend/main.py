@@ -8,6 +8,7 @@ from src.ufc_scraper import get_upcoming_event_links, get_fight_card
 from src.fighter_scraper import scrape_fighter_stats, save_fighter_to_db
 from src.db import SessionLocal, Fighter, ModelPrediction, FightResult
 from src.ensemble_predict import get_ensemble_prediction
+from src.ufc_scheduler import start_scheduler, stop_scheduler, get_scheduler
 from types import SimpleNamespace
 from bs4 import BeautifulSoup
 from sqlalchemy import func
@@ -394,3 +395,50 @@ def update_fight_result(
     
     finally:
         db.close()
+
+# Scheduler startup and shutdown events
+@app.on_event("startup")
+async def startup_event():
+    """Start the UFC scheduler when the app starts"""
+    try:
+        start_scheduler()
+        print("🚀 UFC Scheduler started")
+    except Exception as e:
+        print(f"❌ Failed to start scheduler: {e}")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Stop the UFC scheduler when the app shuts down"""
+    try:
+        stop_scheduler()
+        print("🛑 UFC Scheduler stopped")
+    except Exception as e:
+        print(f"❌ Error stopping scheduler: {e}")
+
+# Scheduler management endpoints
+@app.get("/scheduler/status")
+def get_scheduler_status():
+    """Get the current status of the scheduler"""
+    try:
+        scheduler = get_scheduler()
+        return scheduler.get_status()
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/scheduler/check-results")
+def manual_result_check():
+    """Manually trigger a check for completed events"""
+    try:
+        scheduler = get_scheduler()
+        return scheduler.check_completed_events_manual()
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/scheduler/check-events")
+def manual_event_check():
+    """Manually trigger a check for new events"""
+    try:
+        scheduler = get_scheduler()
+        return scheduler.check_new_events_manual()
+    except Exception as e:
+        return {"error": str(e)}

@@ -1,0 +1,230 @@
+import { useState, useEffect } from "react";
+import { getSchedulerStatus, manualResultCheck, manualEventCheck } from "../services/api";
+
+interface Job {
+    id: string;
+    name: string;
+    next_run: string | null;
+    trigger: string;
+}
+
+interface SchedulerStatus {
+    running: boolean;
+    jobs: Job[];
+    last_event_check: string | null;
+    last_profile_update: string | null;
+    last_result_check: string | null;
+    last_cleanup: string | null;
+}
+
+export default function SchedulerStatus() {
+    const [status, setStatus] = useState<SchedulerStatus | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [checking, setChecking] = useState({ results: false, events: false });
+    const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+    useEffect(() => {
+        fetchStatus();
+        // Refresh status every minute
+        const interval = setInterval(fetchStatus, 60000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const fetchStatus = async () => {
+        try {
+            const data = await getSchedulerStatus();
+            setStatus(data);
+        } catch (error) {
+            console.error("Failed to fetch scheduler status:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const formatDateTime = (isoString: string | null) => {
+        if (!isoString) return "Never";
+        return new Date(isoString).toLocaleString('en-AU', {
+            timeZone: 'Australia/Sydney',
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
+
+    const formatNextRun = (isoString: string | null) => {
+        if (!isoString) return "Not scheduled";
+        const date = new Date(isoString);
+        const now = new Date();
+        const diff = date.getTime() - now.getTime();
+        
+        if (diff < 0) return "Overdue";
+        
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        
+        if (days > 0) return `${days}d ${hours}h`;
+        if (hours > 0) return `${hours}h ${minutes}m`;
+        return `${minutes}m`;
+    };
+
+    const handleManualResultCheck = async () => {
+        setChecking(prev => ({ ...prev, results: true }));
+        setMessage(null);
+        
+        try {
+            const result = await manualResultCheck();
+            setMessage({ 
+                type: 'success', 
+                text: `Result check completed. ${result.pending_predictions || 0} predictions awaiting results.` 
+            });
+            fetchStatus(); // Refresh status
+        } catch (error) {
+            setMessage({ type: 'error', text: 'Failed to check results' });
+        } finally {
+            setChecking(prev => ({ ...prev, results: false }));
+        }
+    };
+
+    const handleManualEventCheck = async () => {
+        setChecking(prev => ({ ...prev, events: true }));
+        setMessage(null);
+        
+        try {
+            await manualEventCheck();
+            setMessage({ type: 'success', text: 'Event check completed successfully' });
+            fetchStatus(); // Refresh status
+        } catch (error) {
+            setMessage({ type: 'error', text: 'Failed to check events' });
+        } finally {
+            setChecking(prev => ({ ...prev, events: false }));
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="bg-black/20 rounded-xl border border-white/10 p-6">
+                <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-gray-300">Loading scheduler status...</span>
+                </div>
+            </div>
+        );
+    }
+
+    if (!status) {
+        return (
+            <div className="bg-black/20 rounded-xl border border-white/10 p-6">
+                <p className="text-red-400">Failed to load scheduler status</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-black/20 rounded-xl border border-white/10 overflow-hidden">
+            {/* Header */}
+            <div className="p-6 border-b border-white/10">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <h3 className="text-xl font-bold text-white">Scheduler Status</h3>
+                        <div className={`flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-medium ${
+                            status.running 
+                                ? 'bg-green-900/30 text-green-300 border border-green-500/30'
+                                : 'bg-red-900/30 text-red-300 border border-red-500/30'
+                        }`}>
+                            <div className={`w-2 h-2 rounded-full ${status.running ? 'bg-green-400' : 'bg-red-400'}`}></div>
+                            {status.running ? 'Running' : 'Stopped'}
+                        </div>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleManualResultCheck}
+                            disabled={checking.results}
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                        >
+                            {checking.results && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+                            Check Results
+                        </button>
+                        <button
+                            onClick={handleManualEventCheck}
+                            disabled={checking.events}
+                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-800 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                        >
+                            {checking.events && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+                            Check Events
+                        </button>
+                    </div>
+                </div>
+                
+                {message && (
+                    <div className={`mt-4 p-3 rounded-lg text-sm ${
+                        message.type === 'success' 
+                            ? 'bg-green-900/30 text-green-300 border border-green-500/30'
+                            : 'bg-red-900/30 text-red-300 border border-red-500/30'
+                    }`}>
+                        {message.text}
+                    </div>
+                )}
+            </div>
+
+            <div className="p-6 space-y-6">
+                {/* Scheduled Jobs */}
+                <div>
+                    <h4 className="text-lg font-semibold text-white mb-4">Scheduled Jobs</h4>
+                    <div className="space-y-3">
+                        {status.jobs.map((job) => (
+                            <div key={job.id} className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
+                                <div>
+                                    <div className="font-medium text-white">{job.name}</div>                                </div>
+                                <div className="text-right">
+                                    <div className="text-sm font-medium text-gray-300">
+                                        Next run: {formatNextRun(job.next_run)}
+                                    </div>
+                                    {job.next_run && (
+                                        <div className="text-xs text-gray-500">
+                                            {formatDateTime(job.next_run)}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Last Update Times */}
+                <div>
+                    <h4 className="text-lg font-semibold text-white mb-4">Last Updates</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-4 bg-white/5 rounded-lg">
+                            <div className="text-sm text-gray-400">Event Check</div>
+                            <div className="font-medium text-white">
+                                {formatDateTime(status.last_event_check)}
+                            </div>
+                        </div>
+                        <div className="p-4 bg-white/5 rounded-lg">
+                            <div className="text-sm text-gray-400">Profile Update</div>
+                            <div className="font-medium text-white">
+                                {formatDateTime(status.last_profile_update)}
+                            </div>
+                        </div>
+                        <div className="p-4 bg-white/5 rounded-lg">
+                            <div className="text-sm text-gray-400">Result Check</div>
+                            <div className="font-medium text-white">
+                                {formatDateTime(status.last_result_check)}
+                            </div>
+                        </div>
+                        <div className="p-4 bg-white/5 rounded-lg">
+                            <div className="text-sm text-gray-400">Database Cleanup</div>
+                            <div className="font-medium text-white">
+                                {formatDateTime(status.last_cleanup)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}

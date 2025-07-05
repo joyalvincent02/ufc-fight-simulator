@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { getModelPerformance, getDetailedPerformance } from "../services/api";
 import PerformanceStats from "../components/PerformanceStats";
 import PredictionsTable from "../components/PredictionsTable";
+import SchedulerStatus from "../components/SchedulerStatus";
 import PageLayout from "../components/PageLayout";
 import Spinner from "../components/Spinner";
 
@@ -145,6 +146,11 @@ export default function ResultsPage() {
                 {performance && (
                     <PerformanceStats stats={performance} />
                 )}
+
+                {/* Scheduler Status */}
+                <div className="mb-8">
+                    <SchedulerStatus />
+                </div>
 
                 {/* Model Comparison */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">

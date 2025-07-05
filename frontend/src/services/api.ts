@@ -55,3 +55,28 @@ export async function updateFightResult(fighterA: string, fighterB: string, actu
   if (!res.ok) throw new Error("Failed to update fight result");
   return res.json();
 }
+
+// Scheduler API functions
+export async function getSchedulerStatus() {
+  const res = await fetch(`${BASE_URL}/scheduler/status`);
+  if (!res.ok) throw new Error("Failed to get scheduler status");
+  return res.json();
+}
+
+export async function manualResultCheck() {
+  const res = await fetch(`${BASE_URL}/scheduler/check-results`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) throw new Error("Failed to trigger result check");
+  return res.json();
+}
+
+export async function manualEventCheck() {
+  const res = await fetch(`${BASE_URL}/scheduler/check-events`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!res.ok) throw new Error("Failed to trigger event check");
+  return res.json();
+}
