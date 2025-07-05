@@ -26,7 +26,6 @@ export default function CustomSimPage() {
     getFighters().then(setFighters).catch(console.error);
   }, []);
 
-  // Re-run simulation when model changes (if we have both fighters selected and a previous result)
   useEffect(() => {
     if (fighterA && fighterB && result) {
       handleSimulate();
@@ -58,11 +57,10 @@ export default function CustomSimPage() {
 
     try {
       const data = await simulateCustomFight(fighterA, fighterB, model);
-      console.log("API Response:", data); // Debug log
       if (data.error) setError(data.error);
       else setResult(data);
     } catch (err) {
-      console.error("Error:", err); // Debug log
+      console.error("Error:", err);
       setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
@@ -77,7 +75,6 @@ export default function CustomSimPage() {
       <div className="relative z-10 max-w-4xl mx-auto">
         <h1 className="text-4xl font-bold mb-10 text-center">Custom Simulation</h1>
 
-        {/* Dropdown for prediction model */}
         <div className="flex justify-center mb-6">
           <div className="flex items-center gap-4 bg-white/5 px-4 py-2 rounded-lg border border-white/10">
             <label htmlFor="model" className="text-white font-medium whitespace-nowrap">
@@ -95,15 +92,12 @@ export default function CustomSimPage() {
               <option value="sim">Simulation</option>
             </select>
             {loading && result && (
-              <span className="text-yellow-400 text-sm ml-2">
-                ⟳ Updating...
-              </span>
+              <span className="text-yellow-400 text-sm ml-2">⟳ Updating...</span>
             )}
           </div>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4 mb-6 relative">
-          {/* Fighter A Input */}
           <div className="flex-1 relative">
             <input
               value={fighterA}
@@ -127,7 +121,6 @@ export default function CustomSimPage() {
             )}
           </div>
 
-          {/* Fighter B Input */}
           <div className="flex-1 relative">
             <input
               value={fighterB}
@@ -182,10 +175,11 @@ export default function CustomSimPage() {
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {result.fighters && result.fighters.length >= 2 ? result.fighters.map((f: any, idx: number) => {
-                const winPct = result.results[f.name] || 0;
-                const otherWinPct = result.results[result.fighters[1 - idx].name] || 0;
-                const drawPct = result.results["Draw"] || 0;
+              {[fighterA, fighterB].map((name, idx) => {
+                const winPct = result.results?.[name] || 0;
+                const otherWinPct = result.results?.[[fighterA, fighterB][1 - idx]] || 0;
+                const drawPct = result.results?.["Draw"] || 0;
+                const image = result.fighters?.[idx]?.image || FALLBACK_IMAGE;
 
                 let borderColor = "#ffffff";
                 if (drawPct >= 45) {
@@ -199,12 +193,12 @@ export default function CustomSimPage() {
                 return (
                   <div key={idx} className="flex flex-col items-center text-center">
                     <img
-                      src={f.image || FALLBACK_IMAGE}
-                      alt={f.name}
+                      src={image}
+                      alt={name}
                       style={{ borderColor }}
                       className="w-24 h-24 rounded-full object-cover border-4 mb-3"
                     />
-                    <p className="text-lg font-bold">{f.name}</p>
+                    <p className="text-lg font-bold">{name}</p>
                     <p className="text-sm text-gray-300">Win %: {winPct.toFixed(1)}%</p>
                     {result.probabilities && (
                       <p className="text-sm text-gray-400">
@@ -213,59 +207,85 @@ export default function CustomSimPage() {
                           (idx === 0
                             ? result.probabilities.P_A
                             : result.probabilities.P_B) * 100
-                        ).toFixed(2)}
-                        %
+                        ).toFixed(2)}%
                       </p>
                     )}
                   </div>
                 );
-              }) : (
-                // Fallback for when fighters array is not available
-                [fighterA, fighterB].map((name, idx) => {
-                  const winPct = result.results?.[name] || 0;
-                  const otherWinPct = result.results?.[[fighterA, fighterB][1 - idx]] || 0;
-                  const drawPct = result.results?.["Draw"] || 0;
-
-                  let borderColor = "#ffffff";
-                  if (drawPct >= 45) {
-                    borderColor = neutralColor;
-                  } else if (winPct > otherWinPct) {
-                    borderColor = winnerColor;
-                  } else if (winPct < otherWinPct) {
-                    borderColor = loserColor;
-                  }
-
-                  return (
-                    <div key={idx} className="flex flex-col items-center text-center">
-                      <img
-                        src={FALLBACK_IMAGE}
-                        alt={name}
-                        style={{ borderColor }}
-                        className="w-24 h-24 rounded-full object-cover border-4 mb-3"
-                      />
-                      <p className="text-lg font-bold">{name}</p>
-                      <p className="text-sm text-gray-300">Win %: {winPct.toFixed(1)}%</p>
-                      {result.probabilities && (
-                        <p className="text-sm text-gray-400">
-                          Exchange Chance:{" "}
-                          {(
-                            (idx === 0
-                              ? result.probabilities.P_A
-                              : result.probabilities.P_B) * 100
-                          ).toFixed(2)}
-                          %
-                        </p>
-                      )}
-                    </div>
-                  );
-                })
-              )}
+              })}
             </div>
 
             {result.probabilities && (
               <div className="mt-6 text-center text-sm text-gray-300">
                 Neutral Exchanges: {(result.probabilities.P_neutral * 100).toFixed(2)}% &nbsp;|&nbsp;
                 Draws: {result.results?.["Draw"]?.toFixed(1) || "0.0"}%
+              </div>
+            )}
+
+            {result.penalty_score !== undefined && result.diffs && model !== "sim" && (
+              <div className="mt-6">
+                <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 p-4 rounded-lg border border-blue-500/30">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                    <h3 className="font-semibold text-blue-300">
+                      {model === "ml" ? "ML Model Analysis" : "Ensemble Model Analysis"}
+                    </h3>
+                  </div>
+
+                  <div className="flex flex-col md:flex-row gap-4 text-sm">
+                    <div className="flex-1 bg-black/20 p-4 rounded-lg border border-white/10 flex flex-col justify-center items-center text-center">
+                      <p className="text-gray-400 text-xs uppercase tracking-wide mb-1">Mismatch Penalty</p>
+                      <p className="text-3xl font-bold text-yellow-400">{(result.penalty_score * 100).toFixed(1)}%</p>
+                    </div>
+
+                    <div className="flex-[2] bg-black/20 p-4 rounded-lg border border-white/10">
+                      <p className="text-gray-400 text-xs uppercase tracking-wide mb-2">Physical Advantages</p>
+                      <div className="grid grid-cols-2 gap-y-3 gap-x-8 text-xs">
+                        <div className="flex items-center">
+                          <span className="text-gray-300 min-w-[52px]">Weight:</span>
+                          <span className="text-white font-medium">
+                            {result.diffs.weight_diff === 0 ? "Even" :
+                              `${result.diffs.weight_diff > 0 ? fighterA : fighterB} +${Math.abs(result.diffs.weight_diff)}lbs`}
+                          </span>
+                        </div>
+                        <div className="flex items-center">
+                          <span className="text-gray-300 min-w-[52px]">Height:</span>
+                          <span className="text-white font-medium">
+                            {result.diffs.height_diff === 0 ? "Even" :
+                              `${result.diffs.height_diff > 0 ? fighterA : fighterB} +${Math.abs(result.diffs.height_diff)}"`}
+                          </span>
+                        </div>
+                        <div className="flex items-center">
+                          <span className="text-gray-300 min-w-[52px]">Reach:</span>
+                          <span className="text-white font-medium">
+                            {result.diffs.reach_diff === 0 ? "Even" :
+                              `${result.diffs.reach_diff > 0 ? fighterA : fighterB} +${Math.abs(result.diffs.reach_diff)}"`}
+                          </span>
+                        </div>
+                        <div className="flex items-center">
+                          <span className="text-gray-300 min-w-[52px]">Age:</span>
+                          <span className="text-white font-medium">
+                            {result.diffs.age_diff === 0 ? "Even" :
+                              `${result.diffs.age_diff < 0 ? fighterA : fighterB} ${Math.abs(result.diffs.age_diff)}yrs younger`}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 pt-4 border-t border-white/10">
+                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                      <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                      <span>
+                        {result.penalty_score > 0.3
+                          ? "High mismatch detected - significant physical differences"
+                          : result.penalty_score > 0.15
+                            ? "Moderate mismatch - notable physical differences"
+                            : "Low mismatch - similar physical attributes"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>

@@ -123,16 +123,16 @@ export default function HomePage() {
         <section className="grid md:grid-cols-3 gap-8 py-16">
           {[
             {
-              title: "Live Fighter Stats",
-              desc: "Always current, scraped directly from UFCStats.com to reflect real-world performance.",
+              title: "Smart Model Switching",
+              desc: "Toggle between simulation, machine learning, and ensemble models to explore different prediction strategies.",
             },
             {
-              title: "Probability Engine",
-              desc: "Built on custom logic and simulation math to predict outcomes fairly.",
+              title: "Detailed Fight Analytics",
+              desc: "Each fight includes mismatch penalties and a breakdown of key physical advantages like reach, height, weight, and age.",
             },
             {
-              title: "Fast & Responsive",
-              desc: "Built with FastAPI, React, Tailwind CSS, and deployed via Azure with CI/CD.",
+              title: "Live Stats + Fast Results",
+              desc: "Pulls fresh fighter stats from UFCStats.com. Powered by FastAPI, React, and deployed via Azure with CI/CD.",
             },
           ].map((item, i) => (
             <div

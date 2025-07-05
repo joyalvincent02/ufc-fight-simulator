@@ -174,36 +174,41 @@ export default function SimulatePage() {
                         <div className="flex-[2] bg-black/20 p-4 rounded-lg border border-white/10">
                           <p className="text-gray-400 text-xs uppercase tracking-wide mb-2">Physical Advantages</p>
                           <div className="grid grid-cols-2 gap-y-3 gap-x-8 text-xs">
-                            <div className="flex justify-between items-center">
-                              <span className="text-gray-300">Weight:</span>
-                              <span className="text-white font-medium text-right">
-                                {diffs.weight_diff === 0 ? 'Even' :
-                                  `${diffs.weight_diff > 0 ? A.name : B.name} +${Math.abs(diffs.weight_diff)}lbs`}
+                            {/* Weight */}
+                            <div className="flex items-center">
+                              <span className="text-gray-300 min-w-[52px]">Weight:</span>
+                              <span className="text-white font-medium">{diffs.weight_diff === 0 ? 'Even' :
+                                `${diffs.weight_diff > 0 ? A.name : B.name} +${Math.abs(diffs.weight_diff)}lbs`}
                               </span>
                             </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-gray-300">Height:</span>
-                              <span className="text-white font-medium text-right">
-                                {diffs.height_diff === 0 ? 'Even' :
-                                  `${diffs.height_diff > 0 ? A.name : B.name} +${Math.abs(diffs.height_diff)}"`}
+
+                            {/* Height */}
+                            <div className="flex items-center">
+                              <span className="text-gray-300 min-w-[52px]">Height:</span>
+                              <span className="text-white font-medium">{diffs.height_diff === 0 ? 'Even' :
+                                `${diffs.height_diff > 0 ? A.name : B.name} +${Math.abs(diffs.height_diff)}"`}
                               </span>
                             </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-gray-300">Reach:</span>
-                              <span className="text-white font-medium text-right">
-                                {diffs.reach_diff === 0 ? 'Even' :
-                                  `${diffs.reach_diff > 0 ? A.name : B.name} +${Math.abs(diffs.reach_diff)}"`}
+
+                            {/* Reach */}
+                            <div className="flex items-center">
+                              <span className="text-gray-300 min-w-[52px]">Reach:</span>
+                              <span className="text-white font-medium">{diffs.reach_diff === 0 ? 'Even' :
+                                `${diffs.reach_diff > 0 ? A.name : B.name} +${Math.abs(diffs.reach_diff)}"`}
                               </span>
                             </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-gray-300">Age:</span>
-                              <span className="text-white font-medium text-right">
-                                {diffs.age_diff === 0 ? 'Even' :
-                                  `${diffs.age_diff < 0 ? A.name : B.name} ${Math.abs(diffs.age_diff)}yrs younger`}
+
+                            {/* Age */}
+                            <div className="flex items-center">
+                              <span className="text-gray-300 min-w-[52px]">Age:</span>
+                              <span className="text-white font-medium">{diffs.age_diff === 0 ? 'Even' :
+                                `${diffs.age_diff < 0 ? A.name : B.name} ${Math.abs(diffs.age_diff)}yr(s) younger`}
                               </span>
                             </div>
                           </div>
+
                         </div>
+
                       </div>
 
                       {/* Model Interpretation */}
