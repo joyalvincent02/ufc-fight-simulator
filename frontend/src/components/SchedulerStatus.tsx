@@ -26,7 +26,6 @@ export default function SchedulerStatus() {
 
     useEffect(() => {
         fetchStatus();
-        // Refresh status every minute
         const interval = setInterval(fetchStatus, 60000);
         return () => clearInterval(interval);
     }, []);
@@ -44,31 +43,82 @@ export default function SchedulerStatus() {
 
     const formatDateTime = (isoString: string | null) => {
         if (!isoString) return "Never";
-        return new Date(isoString).toLocaleString('en-AU', {
-            timeZone: 'Australia/Sydney',
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+        
+        try {
+            // Handle various date formats from the backend
+            let utcDate;
+            
+            // Add timezone indicator if missing
+            if (!isoString.endsWith('Z') && !isoString.includes('+') && !isoString.includes('-', 10)) {
+                utcDate = new Date(isoString + 'Z');
+            } else {
+                utcDate = new Date(isoString);
+            }
+            
+            // Fallback: try parsing without timezone if first attempt fails
+            if (isNaN(utcDate.getTime())) {
+                utcDate = new Date(isoString.replace('Z', '').replace(/[+-]\d{2}:?\d{2}$/, ''));
+            }
+            
+            if (isNaN(utcDate.getTime())) {
+                console.error('Invalid date after all parsing attempts:', isoString);
+                return "Invalid Date";
+            }
+            
+            // Format in user's local timezone
+            return utcDate.toLocaleString(undefined, {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            });
+        } catch (error) {
+            console.error('Error formatting date:', isoString, error);
+            return "Invalid Date";
+        }
     };
 
     const formatNextRun = (isoString: string | null) => {
         if (!isoString) return "Not scheduled";
-        const date = new Date(isoString);
-        const now = new Date();
-        const diff = date.getTime() - now.getTime();
         
-        if (diff < 0) return "Overdue";
-        
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        
-        if (days > 0) return `${days}d ${hours}h`;
-        if (hours > 0) return `${hours}h ${minutes}m`;
-        return `${minutes}m`;
+        try {
+            // Parse date using same strategy as formatDateTime
+            let date;
+            
+            if (!isoString.endsWith('Z') && !isoString.includes('+') && !isoString.includes('-', 10)) {
+                date = new Date(isoString + 'Z');
+            } else {
+                date = new Date(isoString);
+            }
+            
+            if (isNaN(date.getTime())) {
+                date = new Date(isoString.replace('Z', '').replace(/[+-]\d{2}:?\d{2}$/, ''));
+            }
+            
+            if (isNaN(date.getTime())) {
+                console.error('Invalid next run date after all parsing attempts:', isoString);
+                return "Invalid Date";
+            }
+            
+            const now = new Date();
+            const diff = date.getTime() - now.getTime();
+            
+            if (diff < 0) return "Overdue";
+            
+            // Convert milliseconds to human-readable format
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            
+            if (days > 0) return `${days}d ${hours}h`;
+            if (hours > 0) return `${hours}h ${minutes}m`;
+            return `${minutes}m`;
+        } catch (error) {
+            console.error('Error formatting next run:', isoString, error);
+            return "Invalid Date";
+        }
     };
 
     const handleManualResultCheck = async () => {
@@ -81,7 +131,7 @@ export default function SchedulerStatus() {
                 type: 'success', 
                 text: `Result check completed. ${result.pending_predictions || 0} predictions awaiting results.` 
             });
-            fetchStatus(); // Refresh status
+            fetchStatus();
         } catch (error) {
             setMessage({ type: 'error', text: 'Failed to check results' });
         } finally {
@@ -96,7 +146,7 @@ export default function SchedulerStatus() {
         try {
             const result = await manualEventCheck();
             setMessage({ type: 'success', text: result.message || 'Event check completed successfully' });
-            fetchStatus(); // Refresh status to get updated timestamps
+            fetchStatus();
         } catch (error) {
             setMessage({ type: 'error', text: 'Failed to check events' });
         } finally {
@@ -145,7 +195,11 @@ export default function SchedulerStatus() {
                                 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-500/30'
                                 : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-500/30'
                         }`}>
-                            <div className={`w-2 h-2 rounded-full ${status.running ? 'bg-green-400' : 'bg-red-400'}`}></div>
+                            <div className={`w-2 h-2 rounded-full ${
+                                status.running 
+                                    ? 'bg-green-400 animate-pulse' 
+                                    : 'bg-red-400'
+                            }`}></div>
                             {status.running ? 'Running' : 'Stopped'}
                         </div>
                     </div>
