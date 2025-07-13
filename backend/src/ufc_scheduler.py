@@ -251,34 +251,57 @@ class UFCScheduler:
             logger.error(traceback.format_exc())
     
     def _update_fighter_profiles(self):
-        """Update fighter profile data"""
+        """Update fighter profile data and missing images"""
         try:
-            logger.info("Starting fighter profile updates...")
+            logger.info("Starting fighter profile updates and image checks...")
             self.last_profile_update = datetime.utcnow()
             
             db = SessionLocal()
             fighters = db.query(Fighter).all()
-            db.close()
             
             updated_count = 0
+            images_updated = 0
             
             for fighter in fighters:
-                if not fighter.profile_url:
-                    continue
+                fighter_updated = False
                 
-                try:
-                    data = scrape_fighter_stats(fighter.name, fighter.profile_url)
-                    if data:
-                        save_fighter_to_db(data)
-                        updated_count += 1
-                        
-                        # Small delay to be respectful to the website
-                        time.sleep(1)
-                        
-                except Exception as e:
-                    logger.error(f"Failed to update {fighter.name}: {e}")
+                # Update profile stats if URL exists
+                if fighter.profile_url:
+                    try:
+                        data = scrape_fighter_stats(fighter.name, fighter.profile_url)
+                        if data:
+                            save_fighter_to_db(data)
+                            updated_count += 1
+                            fighter_updated = True
+                            
+                    except Exception as e:
+                        logger.error(f"Failed to update profile for {fighter.name}: {e}")
+                
+                # Check for missing image (if we didn't just update profile stats which might include image)
+                if not fighter.image_url:
+                    try:
+                        from src.ufc_image_scraper import get_fighter_image_url
+                        image_url = get_fighter_image_url(fighter.name)
+                        if image_url:
+                            fighter.image_url = image_url
+                            images_updated += 1
+                            logger.info(f"Added missing image for {fighter.name}")
+                            
+                            # Save the image update if we didn't already update this fighter
+                            if not fighter_updated:
+                                db.add(fighter)
+                                
+                    except Exception as e:
+                        logger.error(f"Failed to get image for {fighter.name}: {e}")
+                
+                # Small delay to be respectful to the website
+                time.sleep(1)
             
-            logger.info(f"Fighter profile update completed. Updated {updated_count} fighters")
+            # Commit any image updates
+            db.commit()
+            db.close()
+            
+            logger.info(f"Fighter profile update completed. Updated {updated_count} profiles, {images_updated} missing images")
             
         except Exception as e:
             logger.error(f"Error in fighter profile updates: {e}")
@@ -612,33 +635,56 @@ def job_check_new_events():
         logger.error(traceback.format_exc())
 
 def job_update_fighter_profiles():
-    """Job function for updating fighter profiles"""
+    """Job function for updating fighter profiles and missing images"""
     try:
-        logger.info("Starting fighter profile updates job...")
+        logger.info("Starting fighter profile updates and image checks job...")
         
         db = SessionLocal()
         fighters = db.query(Fighter).all()
-        db.close()
         
         updated_count = 0
+        images_updated = 0
         
         for fighter in fighters:
-            if not fighter.profile_url:
-                continue
+            fighter_updated = False
             
-            try:
-                data = scrape_fighter_stats(fighter.name, fighter.profile_url)
-                if data:
-                    save_fighter_to_db(data)
-                    updated_count += 1
-                    
-                    # Small delay to be respectful to the website
-                    time.sleep(1)
-                    
-            except Exception as e:
-                logger.error(f"Failed to update {fighter.name}: {e}")
+            # Update profile stats if URL exists
+            if fighter.profile_url:
+                try:
+                    data = scrape_fighter_stats(fighter.name, fighter.profile_url)
+                    if data:
+                        save_fighter_to_db(data)
+                        updated_count += 1
+                        fighter_updated = True
+                        
+                except Exception as e:
+                    logger.error(f"Failed to update profile for {fighter.name}: {e}")
+            
+            # Check for missing image (if we didn't just update profile stats which might include image)
+            if not fighter.image_url:
+                try:
+                    from src.ufc_image_scraper import get_fighter_image_url
+                    image_url = get_fighter_image_url(fighter.name)
+                    if image_url:
+                        fighter.image_url = image_url
+                        images_updated += 1
+                        logger.info(f"Added missing image for {fighter.name}")
+                        
+                        # Save the image update if we didn't already update this fighter
+                        if not fighter_updated:
+                            db.add(fighter)
+                            
+                except Exception as e:
+                    logger.error(f"Failed to get image for {fighter.name}: {e}")
+            
+            # Small delay to be respectful to the website
+            time.sleep(1)
         
-        logger.info(f"Fighter profile update completed. Updated {updated_count} fighters")
+        # Commit any image updates
+        db.commit()
+        db.close()
+        
+        logger.info(f"Fighter profile update completed. Updated {updated_count} profiles, {images_updated} missing images")
         
         # Update the global scheduler instance's timestamp
         scheduler = get_scheduler()
