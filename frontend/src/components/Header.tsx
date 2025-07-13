@@ -4,6 +4,10 @@ import MMA_Math from "../assets/mma_math.svg";
 import ThemeToggle from "./ThemeToggle";
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
+import SportsKabaddiIcon from '@mui/icons-material/SportsKabaddi';
+import SportsMmaIcon from '@mui/icons-material/SportsMma';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -89,7 +93,7 @@ export default function Header() {
                 className="flex items-center gap-3 text-gray-700 dark:text-white hover:text-red-500 dark:hover:text-red-400 transition py-3 px-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
                 onClick={closeMobileMenu}
               >
-                <span className="text-2xl">🥊</span>
+                <SportsMmaIcon sx={{ fontSize: 24 }} />
                 <span>Events</span>
               </Link>
               <Link
@@ -97,7 +101,7 @@ export default function Header() {
                 className="flex items-center gap-3 text-gray-700 dark:text-white hover:text-red-500 dark:hover:text-red-400 transition py-3 px-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
                 onClick={closeMobileMenu}
               >
-                <span className="text-2xl">⚔️</span>
+                <SportsKabaddiIcon sx={{ fontSize: 24 }} />
                 <span>Custom</span>
               </Link>
               <Link
@@ -105,7 +109,7 @@ export default function Header() {
                 className="flex items-center gap-3 text-gray-700 dark:text-white hover:text-red-500 dark:hover:text-red-400 transition py-3 px-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
                 onClick={closeMobileMenu}
               >
-                <span className="text-2xl">🤖</span>
+                <SmartToyIcon sx={{ fontSize: 24 }} />
                 <span>Models</span>
               </Link>
               <Link
@@ -113,7 +117,7 @@ export default function Header() {
                 className="flex items-center gap-3 text-gray-700 dark:text-white hover:text-red-500 dark:hover:text-red-400 transition py-3 px-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
                 onClick={closeMobileMenu}
               >
-                <span className="text-2xl">📊</span>
+                <AnalyticsIcon sx={{ fontSize: 24 }} />
                 <span>Results</span>
               </Link>
             </nav>

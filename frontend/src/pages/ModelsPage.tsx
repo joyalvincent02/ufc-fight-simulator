@@ -6,6 +6,16 @@ import ModelCard from "../components/ModelCard";
 import FeatureGrid from "../components/FeatureGrid";
 import InfoBox from "../components/InfoBox";
 import MathFormula from "../components/MathFormula";
+import SportsMmaIcon from '@mui/icons-material/SportsMma';
+import SportsKabaddiIcon from '@mui/icons-material/SportsKabaddi';
+import StraightenIcon from '@mui/icons-material/Straighten';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import CasinoIcon from '@mui/icons-material/Casino';
+import GpsFixedIcon from '@mui/icons-material/GpsFixed';
+import BuildIcon from '@mui/icons-material/Build';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 
 export default function ModelPage() {
   const [expandedModel, setExpandedModel] = useState<string | null>(null);
@@ -17,7 +27,7 @@ export default function ModelPage() {
   const mlFeatures = [
     {
       title: "Striking Metrics",
-      icon: "🥊",
+      icon: <SportsMmaIcon sx={{ fontSize: 20 }} />,
       items: [
         "Strikes Landed per Minute (SLpM)",
         "Striking Accuracy (%)",
@@ -27,7 +37,7 @@ export default function ModelPage() {
     },
     {
       title: "Grappling Metrics", 
-      icon: "🤼",
+      icon: <SportsKabaddiIcon sx={{ fontSize: 20 }} />,
       items: [
         "Takedown Average per 15 min",
         "Takedown Accuracy (%)",
@@ -37,7 +47,7 @@ export default function ModelPage() {
     },
     {
       title: "Physical Attributes",
-      icon: "📏", 
+      icon: <StraightenIcon sx={{ fontSize: 20 }} />, 
       items: [
         "Height (inches)",
         "Weight (pounds)",
@@ -47,7 +57,7 @@ export default function ModelPage() {
     },
     {
       title: "Performance History",
-      icon: "🏆",
+      icon: <EmojiEventsIcon sx={{ fontSize: 20 }} />,
       items: [
         "Win/Loss Record",
         "Recent Form",
@@ -60,7 +70,7 @@ export default function ModelPage() {
   const ensembleFeatures = [
     {
       title: "Machine Learning (60%)",
-      icon: "🤖",
+      icon: <SmartToyIcon sx={{ fontSize: 20 }} />,
       items: [
         "Higher weight due to historical data learning",
         "Captures complex non-linear patterns",
@@ -70,7 +80,7 @@ export default function ModelPage() {
     },
     {
       title: "Simulation (40%)",
-      icon: "🎲", 
+      icon: <CasinoIcon sx={{ fontSize: 20 }} />, 
       items: [
         "Provides fight-by-fight variability",
         "Models round-by-round dynamics",
@@ -100,7 +110,7 @@ export default function ModelPage() {
               id="ensemble"
               title="Ensemble Model (Default)"
               description="Combines all available prediction methods for the most accurate results. Uses weighted averages of simulation and machine learning predictions."
-              icon="🎯"
+              icon={<GpsFixedIcon sx={{ fontSize: 20 }} />}
               isExpanded={expandedModel === 'ensemble'}
               onToggle={toggleModel}
             >
@@ -122,7 +132,7 @@ export default function ModelPage() {
                 <li><strong>Empirical Testing:</strong> 60/40 split showed best validation accuracy</li>
               </ul>
 
-              <InfoBox title="Future Enhancement" icon="🔧" variant="warning">
+              <InfoBox title="Future Enhancement" icon={<BuildIcon sx={{ fontSize: 16 }} />} variant="warning">
                 <p>
                   Future versions will implement <strong>confidence-based weighting</strong> where model weights 
                   adjust based on data quality and prediction confidence for each specific fighter matchup.
@@ -134,7 +144,7 @@ export default function ModelPage() {
               id="ml"
               title="Machine Learning Model"
               description="Uses a trained ML model that learns patterns from historical fight data to predict outcomes based on fighter statistics."
-              icon="🤖"
+              icon={<SmartToyIcon sx={{ fontSize: 20 }} />}
               isExpanded={expandedModel === 'ml'}
               onToggle={toggleModel}
             >
@@ -167,7 +177,7 @@ export default function ModelPage() {
               id="simulation"
               title="Simulation Model"
               description="Uses a biased random walk model to simulate individual rounds and exchanges, providing detailed fight breakdowns."
-              icon="🎲"
+              icon={<CasinoIcon sx={{ fontSize: 20 }} />}
               isExpanded={expandedModel === 'simulation'}
               onToggle={toggleModel}
             >
@@ -218,7 +228,10 @@ export default function ModelPage() {
             </ModelCard>
           </div>
 
-          <h2 className="text-2xl font-bold mt-8 text-red-400">⚠️ Current Limitations</h2>
+          <h2 className="text-2xl font-bold mt-8 text-red-400 flex items-center gap-2">
+            <WarningAmberIcon sx={{ fontSize: 28 }} />
+            Current Limitations
+          </h2>
           <ul className="list-disc ml-6 space-y-2">
             <li>Simulation model doesn't account for early stoppages (KOs/submissions)</li>
             <li>No momentum or fatigue modeling between rounds</li>
@@ -227,7 +240,7 @@ export default function ModelPage() {
             <li>Models are based on historical data and may not reflect recent performance changes</li>
           </ul>
 
-          <InfoBox title="How to Use" icon="💡" variant="info">
+          <InfoBox title="How to Use" icon={<LightbulbIcon sx={{ fontSize: 16 }} />} variant="info">
             <p>
               Choose your preferred prediction model on the simulation pages. The <strong>Ensemble</strong> model 
               is recommended for most accurate results, while the <strong>Simulation</strong> model provides 

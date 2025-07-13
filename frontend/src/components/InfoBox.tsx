@@ -2,7 +2,7 @@ import { type ReactNode } from "react";
 
 interface InfoBoxProps {
   title: string;
-  icon?: string;
+  icon?: string | ReactNode;
   variant?: 'info' | 'warning' | 'success';
   children: ReactNode;
 }
@@ -21,8 +21,9 @@ export default function InfoBox({
 
   return (
     <div className={`${variants[variant]} p-3 rounded-lg border`}>
-      <h5 className={`font-semibold mb-2 ${variant === 'info' ? 'text-blue-800 dark:text-blue-300' : variant === 'warning' ? 'text-yellow-800 dark:text-yellow-300' : 'text-green-800 dark:text-green-300'}`}>
-        {icon && `${icon} `}{title}
+      <h5 className={`font-semibold mb-2 flex items-center gap-2 ${variant === 'info' ? 'text-blue-800 dark:text-blue-300' : variant === 'warning' ? 'text-yellow-800 dark:text-yellow-300' : 'text-green-800 dark:text-green-300'}`}>
+        {icon && <span className="flex items-center">{icon}</span>}
+        <span>{title}</span>
       </h5>
       <div className="text-sm">
         {children}

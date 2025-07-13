@@ -4,7 +4,7 @@ interface ModelCardProps {
   id: string;
   title: string;
   description: string;
-  icon: string;
+  icon: string | ReactNode;
   isExpanded: boolean;
   onToggle: (id: string) => void;
   children: ReactNode;
@@ -27,8 +27,9 @@ export default function ModelCard({
       >
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-xl font-semibold text-red-600 dark:text-red-300 mb-2">
-              {icon} {title}
+            <h3 className="text-xl font-semibold text-red-600 dark:text-red-300 mb-2 flex items-center gap-2">
+              <span className="flex items-center">{icon}</span>
+              <span>{title}</span>
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-300">{description}</p>
           </div>
