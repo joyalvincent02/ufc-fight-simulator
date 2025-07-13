@@ -29,23 +29,44 @@ export default function FighterCard({
   const [isLoading, setIsLoading] = useState(true);
 
   const handleImageError = () => {
+    console.log(`Image failed to load for ${name}: ${imgSrc}`);
     if (!hasError && imgSrc !== FALLBACK_IMAGE) {
       setHasError(true);
       setImgSrc(FALLBACK_IMAGE);
+      setIsLoading(true); // Keep loading state for fallback
+    } else {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
-  const handleImageLoad = () => {
+  const handleImageLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
+    const target = event.target as HTMLImageElement;
+    console.log(`Image loaded successfully for ${name}: ${imgSrc}`, {
+      naturalWidth: target.naturalWidth,
+      naturalHeight: target.naturalHeight,
+      complete: target.complete
+    });
     setIsLoading(false);
   };
 
   // Reset image source when image prop changes
   useEffect(() => {
+    console.log(`Setting image for ${name}: ${image || FALLBACK_IMAGE}`);
     setImgSrc(image || FALLBACK_IMAGE);
     setHasError(false);
     setIsLoading(true);
-  }, [image]);
+    
+    // Set a timeout to handle stuck loading states
+    const timeout = setTimeout(() => {
+      console.log(`Image loading timeout for ${name}, falling back...`);
+      setIsLoading(false); // Stop loading state after timeout
+    }, 8000); // 8 second timeout
+    
+    // Cleanup timeout
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [image, name]);
 
   return (
     <div className="flex flex-col items-center text-center">
@@ -59,6 +80,13 @@ export default function FighterCard({
           </div>
         )}
         <img
+          ref={(img) => {
+            // Check if image is already loaded (cached)
+            if (img && img.complete && img.naturalWidth > 0) {
+              console.log(`Image already loaded for ${name}: ${imgSrc}`);
+              setIsLoading(false);
+            }
+          }}
           src={imgSrc}
           alt={`${name} profile picture`}
           style={{ borderColor }}
