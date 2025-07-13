@@ -1,20 +1,44 @@
 import { useTheme } from '../hooks/useTheme';
 import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined';
 import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined';
+import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightness';
 
 export default function ThemeToggle() {
-  const { effectiveTheme, setTheme } = useTheme();
+  const { theme, effectiveTheme, setTheme } = useTheme();
 
   const handleToggle = () => {
-    // Toggle between light and dark modes
-    setTheme(effectiveTheme === 'dark' ? 'light' : 'dark');
+    // Cycle through: light → dark → system → light
+    if (theme === 'light') {
+      setTheme('dark');
+    } else if (theme === 'dark') {
+      setTheme('system');
+    } else {
+      setTheme('light');
+    }
+  };
+
+  const getIcon = () => {
+    if (theme === 'system') {
+      return <SettingsBrightnessIcon sx={{ fontSize: 14 }} />;
+    }
+    return effectiveTheme === 'dark' ? (
+      <DarkModeOutlinedIcon sx={{ fontSize: 14 }} />
+    ) : (
+      <LightModeOutlinedIcon sx={{ fontSize: 14 }} />
+    );
+  };
+
+  const getTitle = () => {
+    if (theme === 'light') return 'Switch to dark mode';
+    if (theme === 'dark') return 'Switch to system preference';
+    return 'Switch to light mode';
   };
 
   return (
     <button
       onClick={handleToggle}
       className="relative inline-flex items-center w-14 h-7 rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 bg-gray-200 dark:bg-gray-700"
-      title={`Switch to ${effectiveTheme === 'dark' ? 'light' : 'dark'} mode`}
+      title={getTitle()}
     >
       {/* Track */}
       <span className="sr-only">Toggle theme</span>
@@ -27,11 +51,7 @@ export default function ThemeToggle() {
       >
         {/* Icon inside the thumb */}
         <span className="text-gray-600 dark:text-gray-300 flex items-center justify-center">
-          {effectiveTheme === 'dark' ? (
-            <DarkModeOutlinedIcon sx={{ fontSize: 14 }} />
-          ) : (
-            <LightModeOutlinedIcon sx={{ fontSize: 14 }} />
-          )}
+          {getIcon()}
         </span>
       </span>
     </button>
