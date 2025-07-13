@@ -4,7 +4,7 @@ const Spinner = () => (
       <div className="absolute inset-0 rounded-full border-4 border-gray-300 dark:border-white/20 animate-spin"></div>
       <div className="absolute inset-0 rounded-full border-4 border-t-transparent border-red-600 animate-spin"></div>
     </div>
-    <p className="text-sm text-gray-900 dark:text-white font-semibold tracking-wide uppercase">Simulating Fight Card</p>
+    <p className="text-sm text-gray-900 dark:text-white font-semibold tracking-wide uppercase">Simulating Fights</p>
   </div>
 );
 

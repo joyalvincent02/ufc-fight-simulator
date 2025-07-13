@@ -4,6 +4,11 @@ interface PerformanceStatsProps {
         total_predictions: number;
         predictions_with_results: number;
         correct_predictions: number;
+        recent_accuracy: number;
+        recent_predictions_count: number;
+        best_model: string;
+        best_model_accuracy: number;
+        avg_confidence: number;
         model_breakdown: {
             ml: {
                 total: number;

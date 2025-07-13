@@ -296,6 +296,19 @@ def get_model_performance():
         
         overall_accuracy = (len(correct_predictions) / len(predictions_with_results) * 100) if predictions_with_results else 0
         
+        # Get recent performance (last 10 completed predictions)
+        recent_predictions = [p for p in predictions_with_results][-10:] if predictions_with_results else []
+        recent_correct = [p for p in recent_predictions if p.correct is True]
+        recent_accuracy = (len(recent_correct) / len(recent_predictions) * 100) if recent_predictions else 0
+        
+        # Calculate average confidence (using highest probability from each prediction)
+        predictions_with_confidence = [p for p in predictions if p.fighter_a_prob is not None and p.fighter_b_prob is not None]
+        if predictions_with_confidence:
+            total_confidence = sum(max(p.fighter_a_prob, p.fighter_b_prob) for p in predictions_with_confidence)
+            avg_confidence = total_confidence / len(predictions_with_confidence)
+        else:
+            avg_confidence = 0
+        
         # Break down by model
         model_breakdown = {}
         for model in ["ml", "ensemble", "sim"]:
@@ -310,11 +323,24 @@ def get_model_performance():
                 "accuracy": round((len(model_correct) / len(model_with_results) * 100), 1) if model_with_results else 0
             }
         
+        # Find best performing model (after model_breakdown is calculated)
+        best_model = "ensemble"  # default
+        best_accuracy = 0
+        for model_name, stats in model_breakdown.items():
+            if stats["total_with_results"] >= 3 and stats["accuracy"] > best_accuracy:  # At least 3 results for meaningful comparison
+                best_model = model_name
+                best_accuracy = stats["accuracy"]
+        
         return {
             "overall_accuracy": round(overall_accuracy, 1),
             "total_predictions": total_predictions,
             "predictions_with_results": len(predictions_with_results),
             "correct_predictions": len(correct_predictions),
+            "recent_accuracy": round(recent_accuracy, 1),
+            "recent_predictions_count": len(recent_predictions),
+            "best_model": best_model,
+            "best_model_accuracy": round(best_accuracy, 1),
+            "avg_confidence": round(avg_confidence, 1),
             "model_breakdown": model_breakdown
         }
     

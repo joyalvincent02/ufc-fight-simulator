@@ -5,18 +5,33 @@ import PredictionsTable from "../components/PredictionsTable";
 import SchedulerStatus from "../components/SchedulerStatus";
 import PageLayout from "../components/PageLayout";
 import Spinner from "../components/Spinner";
+import Tooltip from "../components/Tooltip";
 import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import GpsFixedIcon from '@mui/icons-material/GpsFixed';
 import TableChartIcon from '@mui/icons-material/TableChart';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import ErrorIcon from '@mui/icons-material/Error';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import TrendingFlatIcon from '@mui/icons-material/TrendingFlat';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import StarIcon from '@mui/icons-material/Star';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 
 interface ModelPerformance {
     overall_accuracy: number;
     total_predictions: number;
     predictions_with_results: number;
     correct_predictions: number;
+    recent_accuracy: number;
+    recent_predictions_count: number;
+    best_model: string;
+    best_model_accuracy: number;
+    avg_confidence: number;
     model_breakdown: {
         ml: {
             total: number;
@@ -56,6 +71,34 @@ interface DetailedPerformance {
     }>;
     total_count: number;
 }
+
+// Helper function to get performance icon
+const getPerformanceIcon = (accuracy: number | undefined) => {
+    if (accuracy === undefined) return '';
+    if (accuracy >= 70) return <CheckCircleIcon sx={{ fontSize: 14, color: 'green' }} />;
+    if (accuracy >= 60) return <WarningIcon sx={{ fontSize: 14, color: 'orange' }} />;
+    if (accuracy >= 50) return <InfoOutlinedIcon sx={{ fontSize: 14, color: 'gray' }} />;
+    return <ErrorIcon sx={{ fontSize: 14, color: 'red' }} />;
+};
+
+// Helper function to get trend icon
+const getTrendIcon = (recent: number | undefined, overall: number | undefined) => {
+    if (!recent || !overall) return <TrendingFlatIcon sx={{ fontSize: 14 }} />;
+    const diff = Math.abs(recent - overall);
+    if (diff < 5) return <TrendingFlatIcon sx={{ fontSize: 14, color: 'gray' }} />;
+    if (recent > overall) return <TrendingUpIcon sx={{ fontSize: 14, color: 'green' }} />;
+    return <TrendingDownIcon sx={{ fontSize: 14, color: 'red' }} />;
+};
+
+// Helper function to get confidence icon
+const getConfidenceIcon = (confidence: number | undefined) => {
+    if (confidence === undefined) return '';
+    if (confidence >= 80) return <PsychologyIcon sx={{ fontSize: 14, color: 'purple' }} />;
+    if (confidence >= 70) return <StarIcon sx={{ fontSize: 14, color: 'blue' }} />;
+    if (confidence >= 60) return <CheckCircleIcon sx={{ fontSize: 14, color: 'green' }} />;
+    if (confidence >= 50) return <WarningIcon sx={{ fontSize: 14, color: 'orange' }} />;
+    return <ErrorIcon sx={{ fontSize: 14, color: 'red' }} />;
+};
 
 export default function ResultsPage() {
     const [performance, setPerformance] = useState<ModelPerformance | null>(null);
@@ -179,9 +222,11 @@ export default function ResultsPage() {
                                             style={{ width: `${performance?.model_breakdown.ml.accuracy || 0}%` }}
                                         />
                                     </div>
-                                    <span className="text-gray-900 dark:text-white font-medium w-12">
-                                        {performance?.model_breakdown.ml.accuracy.toFixed(1)}%
-                                    </span>
+                                    <Tooltip content={`${performance?.model_breakdown.ml.correct || 0}/${performance?.model_breakdown.ml.total_with_results || 0} correct\n${performance?.model_breakdown.ml.total || 0} total predictions\n${(performance?.model_breakdown.ml.total || 0) - (performance?.model_breakdown.ml.total_with_results || 0)} pending results`}>
+                                        <span className="text-gray-900 dark:text-white font-medium w-12 cursor-help">
+                                            {performance?.model_breakdown.ml.accuracy.toFixed(1)}%
+                                        </span>
+                                    </Tooltip>
                                 </div>
                             </div>
                             <div className="flex items-center justify-between">
@@ -193,9 +238,11 @@ export default function ResultsPage() {
                                             style={{ width: `${performance?.model_breakdown.ensemble.accuracy || 0}%` }}
                                         />
                                     </div>
-                                    <span className="text-gray-900 dark:text-white font-medium w-12">
-                                        {performance?.model_breakdown.ensemble.accuracy.toFixed(1)}%
-                                    </span>
+                                    <Tooltip content={`${performance?.model_breakdown.ensemble.correct || 0}/${performance?.model_breakdown.ensemble.total_with_results || 0} correct\n${performance?.model_breakdown.ensemble.total || 0} total predictions\n${(performance?.model_breakdown.ensemble.total || 0) - (performance?.model_breakdown.ensemble.total_with_results || 0)} pending results`}>
+                                        <span className="text-gray-900 dark:text-white font-medium w-12 cursor-help">
+                                            {performance?.model_breakdown.ensemble.accuracy.toFixed(1)}%
+                                        </span>
+                                    </Tooltip>
                                 </div>
                             </div>
                             <div className="flex items-center justify-between">
@@ -207,9 +254,11 @@ export default function ResultsPage() {
                                             style={{ width: `${performance?.model_breakdown.sim.accuracy || 0}%` }}
                                         />
                                     </div>
-                                    <span className="text-gray-900 dark:text-white font-medium w-12">
-                                        {performance?.model_breakdown.sim.accuracy.toFixed(1)}%
-                                    </span>
+                                    <Tooltip content={`${performance?.model_breakdown.sim.correct || 0}/${performance?.model_breakdown.sim.total_with_results || 0} correct\n${performance?.model_breakdown.sim.total || 0} total predictions\n${(performance?.model_breakdown.sim.total || 0) - (performance?.model_breakdown.sim.total_with_results || 0)} pending results`}>
+                                        <span className="text-gray-900 dark:text-white font-medium w-12 cursor-help">
+                                            {performance?.model_breakdown.sim.accuracy.toFixed(1)}%
+                                        </span>
+                                    </Tooltip>
                                 </div>
                             </div>
                         </div>
@@ -225,30 +274,48 @@ export default function ResultsPage() {
                                 <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                                     {performance?.total_predictions || 0}
                                 </div>
-                                <div className="text-sm text-gray-600 dark:text-gray-400">Total Predictions</div>
+                                <Tooltip content={`Total predictions made by all models.\n\nSample size: ${performance?.total_predictions && performance.total_predictions > 500 ? 'Substantial' : performance?.total_predictions && performance.total_predictions > 100 ? 'Good' : 'Limited'}\nMore predictions = better statistical confidence`}>
+                                    <div className="text-sm text-gray-600 dark:text-gray-400">Total Predictions</div>
+                                </Tooltip>
                             </div>
                             <div className="text-center">
                                 <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                                    {performance?.predictions_with_results || 0}
+                                    {performance?.overall_accuracy || 0}%
                                 </div>
-                                <div className="text-sm text-gray-600 dark:text-gray-400">With Results</div>
+                                <Tooltip content={`Overall accuracy across all completed predictions.\n\nStatus: ${performance?.overall_accuracy && performance.overall_accuracy >= 70 ? 'Excellent performance' : performance?.overall_accuracy && performance.overall_accuracy >= 60 ? 'Good performance' : performance?.overall_accuracy && performance.overall_accuracy >= 50 ? 'Baseline (random chance)' : 'Below baseline'}\n${performance?.overall_accuracy && performance.overall_accuracy < 60 ? 'Room for model improvements' : 'Strong predictive capability'}`}>
+                                    <div className="text-sm text-gray-600 dark:text-gray-400">Overall Accuracy</div>
+                                </Tooltip>
                             </div>
                             <div className="text-center">
-                                <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-                                    {((performance?.predictions_with_results || 0) / (performance?.total_predictions || 1) * 100).toFixed(1)}%
+                                <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                                    {performance?.recent_accuracy || 0}%
                                 </div>
-                                <div className="text-sm text-gray-600 dark:text-gray-400">Completion Rate</div>
+                                <Tooltip content={`Recent performance from last ${performance?.recent_predictions_count || 0} predictions.\n\nTrend: ${performance?.recent_accuracy && performance?.overall_accuracy ? Math.abs(performance.recent_accuracy - performance.overall_accuracy) < 5 ? 'Stable performance' : performance.recent_accuracy < performance.overall_accuracy ? `${Math.round(performance.overall_accuracy - performance.recent_accuracy)}% below average` : `${Math.round(performance.recent_accuracy - performance.overall_accuracy)}% above average` : 'Tracking trends...'}\n${performance?.recent_accuracy && performance?.overall_accuracy && performance.recent_accuracy < performance.overall_accuracy - 10 ? 'May need model retraining' : performance?.recent_accuracy && performance?.overall_accuracy && performance.recent_accuracy > performance.overall_accuracy + 10 ? 'Models improving!' : 'Performance is stable'}`}>
+                                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                                        Recent Form ({performance?.recent_predictions_count || 0})
+                                    </div>
+                                </Tooltip>
                             </div>
                             <div className="text-center">
                                 <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                                    {performance?.total_predictions && performance?.predictions_with_results 
-                                        ? (performance.total_predictions - performance.predictions_with_results)
-                                        : 0
-                                    }
+                                    {performance?.avg_confidence || 0}%
                                 </div>
-                                <div className="text-sm text-gray-600 dark:text-gray-400">Pending Results</div>
+                                <Tooltip content={`Average confidence in predictions.\n\nConfidence level: ${performance?.avg_confidence && performance.avg_confidence >= 80 ? 'Very high' : performance?.avg_confidence && performance.avg_confidence >= 70 ? 'High' : performance?.avg_confidence && performance.avg_confidence >= 60 ? 'Reasonable' : performance?.avg_confidence && performance.avg_confidence >= 50 ? 'Moderate' : 'Low'}\n${performance?.avg_confidence && performance?.overall_accuracy ? Math.abs(performance.avg_confidence - performance.overall_accuracy) > 20 ? `${performance.avg_confidence > performance.overall_accuracy ? 'Overconfident' : 'Underconfident'} by ${Math.round(Math.abs(performance.avg_confidence - performance.overall_accuracy))}%` : 'Well calibrated' : 'Tracking calibration...'}`}>
+                                    <div className="text-sm text-gray-600 dark:text-gray-400">Avg Confidence</div>
+                                </Tooltip>
                             </div>
                         </div>
+                        {performance?.best_model && (
+                            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-white/10 text-center">
+                                <Tooltip content={`${performance.best_model.toUpperCase()} is the top performer.\n\n${performance.best_model_accuracy > performance.overall_accuracy + 10 ? 'Significantly outperforming' : performance.best_model_accuracy > performance.overall_accuracy + 5 ? 'Clearly outperforming' : performance.best_model_accuracy > performance.overall_accuracy ? 'Slightly outperforming' : 'Similar performance'}\n${performance.best_model_accuracy > performance.overall_accuracy ? `+${Math.round(performance.best_model_accuracy - performance.overall_accuracy)}% vs overall average` : 'Consistent with average'}\n${performance.best_model_accuracy >= 70 ? 'Excellent accuracy' : performance.best_model_accuracy >= 60 ? 'Solid accuracy' : 'Room for improvement'}`}>
+                                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                                        Best Model: <span className="font-medium text-gray-900 dark:text-white capitalize">
+                                            {performance.best_model}
+                                        </span> ({performance.best_model_accuracy}%)
+                                    </div>
+                                </Tooltip>
+                            </div>
+                        )}
                     </div>
                 </div>
 
