@@ -9,7 +9,7 @@ BASE_URL = "http://ufcstats.com"
 
 def get_upcoming_event_links():
     url = f"{BASE_URL}/statistics/events/upcoming"
-    response = requests.get(url)
+    response = requests.get(url, timeout=30)  # Only add timeout
     soup = BeautifulSoup(response.text, "html.parser")
 
     event_links = []
@@ -103,7 +103,7 @@ def get_completed_event_links(days_back=7):
         return []
 
 def get_fight_card(event_url: str):
-    response = requests.get(event_url)
+    response = requests.get(event_url, timeout=30)  # Only add timeout
     soup = BeautifulSoup(response.text, "html.parser")
 
     fight_rows = soup.select("tbody.b-fight-details__table-body tr")

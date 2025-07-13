@@ -6,6 +6,7 @@ Handles automated data updates for UFC events, fighter profiles, and results.
 
 import logging
 import traceback
+import time
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
@@ -231,7 +232,6 @@ class UFCScheduler:
                         updated_count += 1
                         
                         # Small delay to be respectful to the website
-                        import time
                         time.sleep(1)
                         
                 except Exception as e:
@@ -350,17 +350,19 @@ class UFCScheduler:
         """Save scheduler metadata to database"""
         try:
             db = SessionLocal()
-            metadata = db.query(SchedulerMetadata).filter(SchedulerMetadata.key == key).first()
-            
-            if metadata:
-                metadata.value = value
-                metadata.updated_at = datetime.utcnow()
-            else:
-                metadata = SchedulerMetadata(key=key, value=value, updated_at=datetime.utcnow())
-                db.add(metadata)
-            
-            db.commit()
-            db.close()
+            try:
+                metadata = db.query(SchedulerMetadata).filter(SchedulerMetadata.key == key).first()
+                
+                if metadata:
+                    metadata.value = value
+                    metadata.updated_at = datetime.utcnow()
+                else:
+                    metadata = SchedulerMetadata(key=key, value=value, updated_at=datetime.utcnow())
+                    db.add(metadata)
+                
+                db.commit()
+            finally:
+                db.close()
         except Exception as e:
             logger.error(f"Failed to save metadata {key}: {e}")
     
@@ -550,7 +552,6 @@ def job_update_fighter_profiles():
                     updated_count += 1
                     
                     # Small delay to be respectful to the website
-                    import time
                     time.sleep(1)
                     
             except Exception as e:
@@ -603,7 +604,6 @@ def job_check_completed_events():
                     total_fight_results_found += len(fight_results)
                     logger.info(f"Found {len(fight_results)} fight results for {event['title']}")
                     
-                    event_matches = 0
                     event_matches = 0
                     for result in fight_results:
                         try:

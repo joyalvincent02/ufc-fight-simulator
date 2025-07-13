@@ -80,9 +80,3 @@ export async function manualEventCheck() {
   if (!res.ok) throw new Error("Failed to trigger event check");
   return res.json();
 }
-
-export async function testResultScraping() {
-  const res = await fetch(`${BASE_URL}/test-result-scraping`);
-  if (!res.ok) throw new Error("Failed to test result scraping");
-  return res.json();
-}
