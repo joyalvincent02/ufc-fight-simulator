@@ -12,15 +12,6 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import GpsFixedIcon from '@mui/icons-material/GpsFixed';
 import TableChartIcon from '@mui/icons-material/TableChart';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import WarningIcon from '@mui/icons-material/Warning';
-import ErrorIcon from '@mui/icons-material/Error';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import TrendingDownIcon from '@mui/icons-material/TrendingDown';
-import TrendingFlatIcon from '@mui/icons-material/TrendingFlat';
-import PsychologyIcon from '@mui/icons-material/Psychology';
-import StarIcon from '@mui/icons-material/Star';
-import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 
 interface ModelPerformance {
     overall_accuracy: number;
@@ -71,34 +62,6 @@ interface DetailedPerformance {
     }>;
     total_count: number;
 }
-
-// Helper function to get performance icon
-const getPerformanceIcon = (accuracy: number | undefined) => {
-    if (accuracy === undefined) return '';
-    if (accuracy >= 70) return <CheckCircleIcon sx={{ fontSize: 14, color: 'green' }} />;
-    if (accuracy >= 60) return <WarningIcon sx={{ fontSize: 14, color: 'orange' }} />;
-    if (accuracy >= 50) return <InfoOutlinedIcon sx={{ fontSize: 14, color: 'gray' }} />;
-    return <ErrorIcon sx={{ fontSize: 14, color: 'red' }} />;
-};
-
-// Helper function to get trend icon
-const getTrendIcon = (recent: number | undefined, overall: number | undefined) => {
-    if (!recent || !overall) return <TrendingFlatIcon sx={{ fontSize: 14 }} />;
-    const diff = Math.abs(recent - overall);
-    if (diff < 5) return <TrendingFlatIcon sx={{ fontSize: 14, color: 'gray' }} />;
-    if (recent > overall) return <TrendingUpIcon sx={{ fontSize: 14, color: 'green' }} />;
-    return <TrendingDownIcon sx={{ fontSize: 14, color: 'red' }} />;
-};
-
-// Helper function to get confidence icon
-const getConfidenceIcon = (confidence: number | undefined) => {
-    if (confidence === undefined) return '';
-    if (confidence >= 80) return <PsychologyIcon sx={{ fontSize: 14, color: 'purple' }} />;
-    if (confidence >= 70) return <StarIcon sx={{ fontSize: 14, color: 'blue' }} />;
-    if (confidence >= 60) return <CheckCircleIcon sx={{ fontSize: 14, color: 'green' }} />;
-    if (confidence >= 50) return <WarningIcon sx={{ fontSize: 14, color: 'orange' }} />;
-    return <ErrorIcon sx={{ fontSize: 14, color: 'red' }} />;
-};
 
 export default function ResultsPage() {
     const [performance, setPerformance] = useState<ModelPerformance | null>(null);
