@@ -177,6 +177,8 @@ class UFCScheduler:
                     for fight in fight_card:
                         fighter_a = fight["fighter_a"]
                         fighter_b = fight["fighter_b"]
+                        url_a = fight.get("url_a")
+                        url_b = fight.get("url_b")
                         
                         # Check if predictions already exist
                         db = SessionLocal()
@@ -189,7 +191,46 @@ class UFCScheduler:
                             db.close()
                             continue
                         
+                        # Check if fighters exist in database, scrape if missing (like simulate event endpoint)
+                        from src.fighter_scraper import scrape_fighter_stats
+                        from src.ufc_image_scraper import get_fighter_image_url
+                        
+                        f1 = db.query(Fighter).filter(Fighter.name == fighter_a).first()
+                        if not f1 and url_a:
+                            logger.info(f"Fighter {fighter_a} not found in database, scraping data...")
+                            try:
+                                stats = scrape_fighter_stats(fighter_a, url_a)
+                                if stats:
+                                    image_url = get_fighter_image_url(fighter_a)
+                                    if image_url:
+                                        stats["image_url"] = image_url
+                                    save_fighter_to_db(stats)
+                                    f1 = db.query(Fighter).filter(Fighter.name == fighter_a).first()
+                                    logger.info(f"Successfully scraped and saved data for {fighter_a}")
+                            except Exception as scrape_error:
+                                logger.error(f"Failed to scrape data for {fighter_a}: {scrape_error}")
+                        
+                        f2 = db.query(Fighter).filter(Fighter.name == fighter_b).first()
+                        if not f2 and url_b:
+                            logger.info(f"Fighter {fighter_b} not found in database, scraping data...")
+                            try:
+                                stats = scrape_fighter_stats(fighter_b, url_b)
+                                if stats:
+                                    image_url = get_fighter_image_url(fighter_b)
+                                    if image_url:
+                                        stats["image_url"] = image_url
+                                    save_fighter_to_db(stats)
+                                    f2 = db.query(Fighter).filter(Fighter.name == fighter_b).first()
+                                    logger.info(f"Successfully scraped and saved data for {fighter_b}")
+                            except Exception as scrape_error:
+                                logger.error(f"Failed to scrape data for {fighter_b}: {scrape_error}")
+                        
                         db.close()
+                        
+                        # Only proceed if we have both fighters
+                        if not f1 or not f2:
+                            logger.warning(f"Skipping prediction for {fighter_a} vs {fighter_b} - missing fighter data (f1: {bool(f1)}, f2: {bool(f2)})")
+                            continue
                         
                         # Generate predictions for all three models
                         try:
@@ -469,6 +510,8 @@ def job_check_new_events():
                 for fight in fight_card:
                     fighter_a = fight["fighter_a"]
                     fighter_b = fight["fighter_b"]
+                    url_a = fight.get("url_a")
+                    url_b = fight.get("url_b")
                     
                     # Check if predictions already exist
                     db = SessionLocal()
@@ -481,7 +524,45 @@ def job_check_new_events():
                         db.close()
                         continue
                     
+                    # Check if fighters exist in database, scrape if missing (like simulate event endpoint)
+                    from src.ufc_image_scraper import get_fighter_image_url
+                    
+                    f1 = db.query(Fighter).filter(Fighter.name == fighter_a).first()
+                    if not f1 and url_a:
+                        logger.info(f"Fighter {fighter_a} not found in database, scraping data...")
+                        try:
+                            stats = scrape_fighter_stats(fighter_a, url_a)
+                            if stats:
+                                image_url = get_fighter_image_url(fighter_a)
+                                if image_url:
+                                    stats["image_url"] = image_url
+                                save_fighter_to_db(stats)
+                                f1 = db.query(Fighter).filter(Fighter.name == fighter_a).first()
+                                logger.info(f"Successfully scraped and saved data for {fighter_a}")
+                        except Exception as scrape_error:
+                            logger.error(f"Failed to scrape data for {fighter_a}: {scrape_error}")
+                    
+                    f2 = db.query(Fighter).filter(Fighter.name == fighter_b).first()
+                    if not f2 and url_b:
+                        logger.info(f"Fighter {fighter_b} not found in database, scraping data...")
+                        try:
+                            stats = scrape_fighter_stats(fighter_b, url_b)
+                            if stats:
+                                image_url = get_fighter_image_url(fighter_b)
+                                if image_url:
+                                    stats["image_url"] = image_url
+                                save_fighter_to_db(stats)
+                                f2 = db.query(Fighter).filter(Fighter.name == fighter_b).first()
+                                logger.info(f"Successfully scraped and saved data for {fighter_b}")
+                        except Exception as scrape_error:
+                            logger.error(f"Failed to scrape data for {fighter_b}: {scrape_error}")
+                    
                     db.close()
+                    
+                    # Only proceed if we have both fighters
+                    if not f1 or not f2:
+                        logger.warning(f"Skipping prediction for {fighter_a} vs {fighter_b} - missing fighter data (f1: {bool(f1)}, f2: {bool(f2)})")
+                        continue
                     
                     # Generate predictions for all three models
                     try:
