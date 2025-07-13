@@ -6,6 +6,7 @@ import FighterCard from "../components/FighterCard";
 import ModelAnalysis from "../components/ModelAnalysis";
 import PageLayout from "../components/PageLayout";
 import FighterInput from "../components/FighterInput";
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 
 const FALLBACK_IMAGE =
   "https://www.ufc.com/themes/custom/ufc/assets/img/no-profile-image.png";
@@ -16,13 +17,31 @@ const neutralColor = "#d65500";
 
 type Fighter = { name: string; image?: string };
 
+type SimulationResult = {
+  fighters?: Fighter[];
+  results?: Record<string, number>;
+  probabilities?: {
+    P_A: number;
+    P_B: number;
+    P_neutral: number;
+  };
+  penalty_score?: number;
+  diffs?: {
+    weight_diff: number;
+    height_diff: number;
+    reach_diff: number;
+    age_diff: number;
+  };
+  error?: string;
+};
+
 export default function CustomSimPage() {
   const [fighterA, setFighterA] = useState("");
   const [fighterB, setFighterB] = useState("");
   const [suggestions, setSuggestions] = useState<Fighter[]>([]);
   const [fighters, setFighters] = useState<Fighter[]>([]);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<SimulationResult | null>(null);
   const [error, setError] = useState("");
   const [activeField, setActiveField] = useState<"A" | "B" | null>(null);
   const [model, setModel] = useState("ensemble");
@@ -32,10 +51,12 @@ export default function CustomSimPage() {
   }, []);
 
   useEffect(() => {
-    if (fighterA && fighterB && result) {
+    // Only re-simulate when model changes and we already have a result
+    if (fighterA && fighterB && result && model) {
       handleSimulate();
     }
-  }, [model]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [model]); // Only depend on model changes
 
   const handleInputChange = (value: string, which: "A" | "B") => {
     if (which === "A") setFighterA(value);
@@ -104,13 +125,19 @@ export default function CustomSimPage() {
       </div>
 
       <div className="text-center">
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-          ⚠️ Not all fighters are available yet but the database is continuously being updated.
-        </p>
+        <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+          <WarningAmberIcon 
+            sx={{ fontSize: 20 }} 
+            className="text-amber-600 dark:text-amber-400 inline mr-2" 
+          />
+          <span className="text-sm text-amber-700 dark:text-amber-300">
+            Not all fighters are available yet but the database is continuously being updated.
+          </span>
+        </div>
         <button
           onClick={handleSimulate}
-          disabled={loading}
-          className="bg-red-600 hover:bg-red-700 px-8 py-3 rounded-lg font-semibold shadow text-white disabled:opacity-50 transition"
+          disabled={loading || !fighterA.trim() || !fighterB.trim()}
+          className="bg-red-600 hover:bg-red-700 px-8 py-3 rounded-lg font-semibold shadow text-white disabled:opacity-50 disabled:cursor-not-allowed transition"
         >
           {loading ? "Simulating..." : "Simulate Fight"}
         </button>

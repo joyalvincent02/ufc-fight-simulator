@@ -82,35 +82,39 @@ export default function Header() {
 
         {/* Mobile Navigation Dropdown */}
         {isMobileMenuOpen && (
-          <div className="md:hidden mt-4 pb-4 border-t border-gray-200 dark:border-gray-700 pt-4">
-            <nav className="flex flex-col space-y-3">
+          <div className="md:hidden mt-4 pb-4 border-t border-gray-200 dark:border-gray-700 pt-4 animate-in slide-in-from-top-2 duration-200">
+            <nav className="flex flex-col space-y-2">
               <Link
                 to="/events"
-                className="text-gray-700 dark:text-white hover:text-red-500 dark:hover:text-red-400 transition py-2 px-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                className="flex items-center gap-3 text-gray-700 dark:text-white hover:text-red-500 dark:hover:text-red-400 transition py-3 px-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
                 onClick={closeMobileMenu}
               >
-                Events
+                <span className="text-2xl">🥊</span>
+                <span>Events</span>
               </Link>
               <Link
                 to="/custom"
-                className="text-gray-700 dark:text-white hover:text-red-500 dark:hover:text-red-400 transition py-2 px-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                className="flex items-center gap-3 text-gray-700 dark:text-white hover:text-red-500 dark:hover:text-red-400 transition py-3 px-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
                 onClick={closeMobileMenu}
               >
-                Custom
+                <span className="text-2xl">⚔️</span>
+                <span>Custom</span>
               </Link>
               <Link
                 to="/models"
-                className="text-gray-700 dark:text-white hover:text-red-500 dark:hover:text-red-400 transition py-2 px-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                className="flex items-center gap-3 text-gray-700 dark:text-white hover:text-red-500 dark:hover:text-red-400 transition py-3 px-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
                 onClick={closeMobileMenu}
               >
-                Models
+                <span className="text-2xl">🤖</span>
+                <span>Models</span>
               </Link>
               <Link
                 to="/results"
-                className="text-gray-700 dark:text-white hover:text-red-500 dark:hover:text-red-400 transition py-2 px-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                className="flex items-center gap-3 text-gray-700 dark:text-white hover:text-red-500 dark:hover:text-red-400 transition py-3 px-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
                 onClick={closeMobileMenu}
               >
-                Results
+                <span className="text-2xl">📊</span>
+                <span>Results</span>
               </Link>
             </nav>
           </div>
