@@ -247,9 +247,24 @@ class UFCScheduler:
         """Manual trigger for checking completed events (called from API)"""
         try:
             logger.info("Manual trigger: Checking completed events...")
-            job_check_completed_events()  # Call the module-level function
+            result = job_check_completed_events()  # This now returns a dict with results
+            
+            if "error" in result:
+                return {"error": result["error"]}
+            
+            updated_count = result.get("updated_predictions", 0)
+            
+            # Also get pending predictions count
+            db = SessionLocal()
+            pending_predictions = db.query(ModelPrediction).filter(
+                ModelPrediction.actual_winner.is_(None)
+            ).count()
+            db.close()
+            
             return {
-                "message": "Manual result check completed",
+                "message": f"Manual result check completed. Updated {updated_count} predictions.",
+                "updated_predictions": updated_count,
+                "pending_predictions": pending_predictions,
                 "timestamp": datetime.utcnow().isoformat()
             }
         except Exception as e:
@@ -468,12 +483,35 @@ def job_check_new_events():
                     
                     # Generate predictions for all three models
                     try:
-                        result = get_ensemble_prediction(fighter_a, fighter_b)
-                        if result and not result.get('error'):
-                            new_predictions += 3  # ML, Ensemble, Sim
-                            logger.info(f"Generated predictions for {fighter_a} vs {fighter_b}")
+                        predictions_created = 0
+                        
+                        # Generate ML prediction
+                        ml_result = get_ensemble_prediction(fighter_a, fighter_b, model_type="ml", log_to_db=True)
+                        if ml_result and not ml_result.get('error'):
+                            predictions_created += 1
+                            logger.info(f"Generated ML prediction for {fighter_a} vs {fighter_b}")
+                        
+                        # Generate Ensemble prediction  
+                        ensemble_result = get_ensemble_prediction(fighter_a, fighter_b, model_type="ensemble", log_to_db=True)
+                        if ensemble_result and not ensemble_result.get('error'):
+                            predictions_created += 1
+                            logger.info(f"Generated Ensemble prediction for {fighter_a} vs {fighter_b}")
+                        
+                        # Generate Simulation prediction
+                        sim_result = get_ensemble_prediction(fighter_a, fighter_b, model_type="sim", log_to_db=True)
+                        if sim_result and not sim_result.get('error'):
+                            predictions_created += 1
+                            logger.info(f"Generated Simulation prediction for {fighter_a} vs {fighter_b}")
+                        
+                        new_predictions += predictions_created
+                        
+                        if predictions_created == 3:
+                            logger.info(f"Successfully generated all 3 predictions for {fighter_a} vs {fighter_b}")
+                        else:
+                            logger.warning(f"Only generated {predictions_created}/3 predictions for {fighter_a} vs {fighter_b}")
+                            
                     except Exception as e:
-                        logger.error(f"Failed to generate prediction for {fighter_a} vs {fighter_b}: {e}")
+                        logger.error(f"Failed to generate predictions for {fighter_a} vs {fighter_b}: {e}")
             
             except Exception as e:
                 logger.error(f"Error processing event {event.get('title', 'Unknown')}: {e}")
@@ -531,25 +569,119 @@ def job_update_fighter_profiles():
         logger.error(traceback.format_exc())
 
 def job_check_completed_events():
-    """Job function for checking completed events"""
+    """Job function for checking completed events and updating results"""
     try:
-        logger.info("Checking for completed events job...")
+        logger.info("Checking for completed events and updating results...")
         
-        # This is a placeholder for result checking logic
-        # In a full implementation, you would:
-        # 1. Scrape UFC results from completed events
-        # 2. Match them with existing predictions
-        # 3. Update the actual_winner and correct fields
+        from src.ufc_scraper import get_completed_event_links, get_fight_results, normalize_fighter_name
         
-        # For now, we'll just log that the check happened
+        # Get completed events from the last 7 days
+        completed_events = get_completed_event_links(days_back=7)
+        logger.info(f"Found {len(completed_events)} completed events in the last 7 days")
+        
+        if not completed_events:
+            logger.info("No completed events found in the specified timeframe")
+            # Update timestamp even if no events found
+            scheduler = get_scheduler()
+            timestamp = datetime.utcnow()
+            scheduler.last_result_check = timestamp
+            scheduler._save_metadata('last_result_check', timestamp.isoformat())
+            return {"updated_predictions": 0}
+        
         db = SessionLocal()
-        pending_predictions = db.query(ModelPrediction).filter(
-            ModelPrediction.actual_winner.is_(None)
-        ).count()
-        db.close()
+        total_updated = 0
+        total_fight_results_found = 0
+        detailed_results = []
         
-        logger.info(f"Found {pending_predictions} predictions awaiting results")
-        logger.info("Result checking completed (manual result entry still required)")
+        try:
+            for event in completed_events:
+                logger.info(f"Processing results for: {event['title']}")
+                
+                try:
+                    # Get fight results from this event
+                    fight_results = get_fight_results(event['url'])
+                    total_fight_results_found += len(fight_results)
+                    logger.info(f"Found {len(fight_results)} fight results for {event['title']}")
+                    
+                    event_matches = 0
+                    event_matches = 0
+                    for result in fight_results:
+                        try:
+                            fighter_a_norm = normalize_fighter_name(result['fighter_a'])
+                            fighter_b_norm = normalize_fighter_name(result['fighter_b'])
+                            winner_norm = normalize_fighter_name(result['winner'])
+                            
+                            # Find matching predictions in database
+                            predictions = db.query(ModelPrediction).filter(
+                                ModelPrediction.actual_winner.is_(None)
+                            ).all()
+                            
+                            fight_matched = False
+                            for prediction in predictions:
+                                pred_a_norm = normalize_fighter_name(prediction.fighter_a)
+                                pred_b_norm = normalize_fighter_name(prediction.fighter_b)
+                                
+                                # Check if this prediction matches the fight result
+                                if ((pred_a_norm == fighter_a_norm and pred_b_norm == fighter_b_norm) or
+                                    (pred_a_norm == fighter_b_norm and pred_b_norm == fighter_a_norm)):
+                                    
+                                    # Determine the actual winner in terms of our prediction
+                                    if winner_norm == pred_a_norm:
+                                        actual_winner = prediction.fighter_a
+                                    elif winner_norm == pred_b_norm:
+                                        actual_winner = prediction.fighter_b
+                                    else:
+                                        logger.warning(f"Winner {result['winner']} doesn't match either fighter in prediction")
+                                        continue
+                                    
+                                    # Update the prediction with actual result
+                                    prediction.actual_winner = actual_winner
+                                    prediction.correct = (prediction.predicted_winner == actual_winner)
+                                    
+                                    logger.info(f"Updated prediction: {prediction.fighter_a} vs {prediction.fighter_b} - Winner: {actual_winner}, Correct: {prediction.correct}")
+                                    total_updated += 1
+                                    event_matches += 1
+                                    fight_matched = True
+                            
+                            # Track unmatched fights for debugging
+                            if not fight_matched:
+                                detailed_results.append({
+                                    "fight": f"{result['fighter_a']} vs {result['fighter_b']}",
+                                    "winner": result['winner'],
+                                    "status": "No matching prediction found",
+                                    "event": event['title']
+                                })
+                                logger.warning(f"No matching prediction found for: {result['fighter_a']} vs {result['fighter_b']} (Winner: {result['winner']})")
+                                    
+                        except Exception as e:
+                            logger.error(f"Error processing fight result {result}: {e}")
+                            continue
+                    
+                    logger.info(f"Event {event['title']}: {event_matches} fights matched out of {len(fight_results)} results found")
+                            
+                except Exception as e:
+                    logger.error(f"Error getting results for event {event['title']}: {e}")
+                    continue
+            
+            # Commit all updates
+            if total_updated > 0:
+                db.commit()
+                logger.info(f"Successfully updated {total_updated} predictions with fight results")
+                logger.info(f"Total fight results found across all events: {total_fight_results_found}")
+                logger.info(f"Unmatched fights: {len(detailed_results)}")
+                for unmatched in detailed_results:
+                    logger.info(f"  - {unmatched['fight']} (Winner: {unmatched['winner']}) in {unmatched['event']}")
+            else:
+                logger.info("No predictions were updated - no matching fights found")
+                logger.info(f"Total fight results found: {total_fight_results_found}")
+                logger.info(f"All {len(detailed_results)} fights were unmatched")
+            
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error updating predictions: {e}")
+            raise
+        finally:
+            db.close()
         
         # Update the global scheduler instance's timestamp
         scheduler = get_scheduler()
@@ -557,9 +689,17 @@ def job_check_completed_events():
         scheduler.last_result_check = timestamp
         scheduler._save_metadata('last_result_check', timestamp.isoformat())
         
+        return {
+            "updated_predictions": total_updated,
+            "total_fight_results_found": total_fight_results_found,
+            "unmatched_fights": len(detailed_results),
+            "detailed_unmatched": detailed_results
+        }
+        
     except Exception as e:
-        logger.error(f"Error checking completed events job: {e}")
+        logger.error(f"Error in job_check_completed_events: {e}")
         logger.error(traceback.format_exc())
+        return {"error": str(e)}
 
 def job_cleanup_old_predictions():
     """Job function for cleaning up old predictions"""

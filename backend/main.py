@@ -16,6 +16,7 @@ import requests
 import re
 import json
 import os
+import traceback
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -442,3 +443,111 @@ def manual_event_check():
         return scheduler.check_new_events_manual()
     except Exception as e:
         return {"error": str(e)}
+
+@app.post("/scheduler/pause")
+def pause_scheduler():
+    """Pause the scheduler to stop automatic job execution"""
+    try:
+        scheduler = get_scheduler()
+        scheduler.scheduler.pause()
+        return {"message": "Scheduler paused successfully"}
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/scheduler/resume")
+def resume_scheduler():
+    """Resume the scheduler to allow automatic job execution"""
+    try:
+        scheduler = get_scheduler()
+        scheduler.scheduler.resume()
+        return {"message": "Scheduler resumed successfully"}
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/test-result-scraping")
+def test_result_scraping():
+    """Test endpoint to verify result scraping functionality"""
+    try:
+        from src.ufc_scraper import get_completed_event_links, get_fight_results, normalize_fighter_name
+        
+        # Get a few recent completed events with more generous timeframe
+        completed_events = get_completed_event_links(days_back=90)  # Increased to 90 days
+        
+        if not completed_events:
+            return {"message": "No completed events found in the last 90 days"}
+        
+        # Test with multiple recent events to find results
+        debug_info = []
+        total_results = 0
+        
+        for i, event in enumerate(completed_events[:3]):  # Test first 3 events
+            try:
+                results = get_fight_results(event['url'])
+                debug_info.append({
+                    "event": event['title'],
+                    "url": event['url'],
+                    "date": event.get('date', 'Unknown'),
+                    "results_count": len(results),
+                    "sample_results": results[:2] if results else []  # Show first 2 results
+                })
+                total_results += len(results)
+            except Exception as e:
+                debug_info.append({
+                    "event": event['title'],
+                    "url": event['url'],
+                    "error": str(e)
+                })
+        
+        return {
+            "total_events_checked": len(debug_info),
+            "total_results_found": total_results,
+            "events_detail": debug_info,
+            "message": f"Detailed result scraping test completed. Found {total_results} total results across {len(debug_info)} events."
+        }
+        
+    except Exception as e:
+        return {"error": str(e), "traceback": traceback.format_exc()}
+
+@app.get("/debug-event-html/{event_id}")
+def debug_event_html(event_id: str):
+    """Debug endpoint to examine the HTML structure of an event page"""
+    try:
+        event_url = f"http://ufcstats.com/event-details/{event_id}"
+        response = requests.get(event_url)
+        soup = BeautifulSoup(response.text, "html.parser")
+        
+        # Get basic event info
+        title_tag = soup.find("h2", class_="b-content__title")
+        event_title = title_tag.get_text(strip=True) if title_tag else "Unknown Event"
+        
+        # Find fight table
+        fight_rows = soup.select("tbody.b-fight-details__table-body tr")
+        
+        debug_info = {
+            "event_title": event_title,
+            "event_url": event_url,
+            "total_fight_rows": len(fight_rows),
+            "sample_fight_structure": []
+        }
+        
+        # Analyze first few fights for structure
+        for i, row in enumerate(fight_rows[:3]):
+            fighter_links = row.select("a.b-link.b-link_style_black")
+            cells = row.select("td")
+            
+            fight_debug = {
+                "row_index": i,
+                "fighter_links_count": len(fighter_links),
+                "total_cells": len(cells),
+                "fighters": [link.get_text(strip=True) for link in fighter_links[:2]],
+                "cell_contents": [cell.get_text(strip=True)[:50] for cell in cells[:8]],  # First 8 cells, truncated
+                "row_html_sample": str(row)[:500]  # First 500 chars of HTML
+            }
+            debug_info["sample_fight_structure"].append(fight_debug)
+        
+        return debug_info
+        
+    except Exception as e:
+        return {"error": str(e), "traceback": traceback.format_exc()}
+
+# Scheduler API functions

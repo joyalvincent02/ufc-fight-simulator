@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getSchedulerStatus, manualResultCheck, manualEventCheck } from "../services/api";
+import { getSchedulerStatus, manualResultCheck, manualEventCheck, testResultScraping } from "../services/api";
 
 interface Job {
     id: string;
@@ -20,12 +20,13 @@ interface SchedulerStatus {
 export default function SchedulerStatus() {
     const [status, setStatus] = useState<SchedulerStatus | null>(null);
     const [loading, setLoading] = useState(true);
-    const [checking, setChecking] = useState({ results: false, events: false });
+    const [checking, setChecking] = useState({ results: false, events: false, testing: false });
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
 
     useEffect(() => {
         fetchStatus();
+        // Refresh status every minute to show updated timestamps
         const interval = setInterval(fetchStatus, 60000);
         return () => clearInterval(interval);
     }, []);
@@ -127,10 +128,25 @@ export default function SchedulerStatus() {
         
         try {
             const result = await manualResultCheck();
-            setMessage({ 
-                type: 'success', 
-                text: `Result check completed. ${result.pending_predictions || 0} predictions awaiting results.` 
-            });
+            
+            if (result.error) {
+                setMessage({ type: 'error', text: result.error });
+            } else {
+                const updatedCount = result.updated_predictions || 0;
+                const pendingCount = result.pending_predictions || 0;
+                
+                if (updatedCount > 0) {
+                    setMessage({ 
+                        type: 'success', 
+                        text: `Result check completed! Updated ${updatedCount} predictions. ${pendingCount} predictions still awaiting results.` 
+                    });
+                } else {
+                    setMessage({ 
+                        type: 'success', 
+                        text: `Result check completed. No new results found. ${pendingCount} predictions awaiting results.` 
+                    });
+                }
+            }
             fetchStatus();
         } catch (error) {
             setMessage({ type: 'error', text: 'Failed to check results' });
@@ -151,6 +167,38 @@ export default function SchedulerStatus() {
             setMessage({ type: 'error', text: 'Failed to check events' });
         } finally {
             setChecking(prev => ({ ...prev, events: false }));
+        }
+    };
+
+    const handleTestResultScraping = async () => {
+        setChecking(prev => ({ ...prev, testing: true }));
+        setMessage(null);
+        
+        try {
+            const result = await testResultScraping();
+            
+            if (result.error) {
+                setMessage({ type: 'error', text: `Test failed: ${result.error}` });
+            } else {
+                const totalResults = result.total_results_found || 0;
+                const eventsChecked = result.total_events_checked || 0;
+                
+                if (totalResults > 0) {
+                    setMessage({ 
+                        type: 'success', 
+                        text: `Test completed! Found ${totalResults} fight results across ${eventsChecked} recent events. Scraping system is working correctly.` 
+                    });
+                } else {
+                    setMessage({ 
+                        type: 'success', 
+                        text: `Test completed. Checked ${eventsChecked} events but found 0 results. This may be normal if events are very recent or the website structure has changed.` 
+                    });
+                }
+            }
+        } catch (error) {
+            setMessage({ type: 'error', text: 'Failed to test result scraping' });
+        } finally {
+            setChecking(prev => ({ ...prev, testing: false }));
         }
     };
 
@@ -226,6 +274,17 @@ export default function SchedulerStatus() {
                         >
                             {checking.events && <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
                             <span>Check Events</span>
+                        </button>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleTestResultScraping();
+                            }}
+                            disabled={checking.testing}
+                            className="px-3 sm:px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-800 disabled:opacity-50 text-white rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                        >
+                            {checking.testing && <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+                            <span>Test Result Scraping</span>
                         </button>
                     </div>
                 </div>
