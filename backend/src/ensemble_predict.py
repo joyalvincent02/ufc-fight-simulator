@@ -58,14 +58,14 @@ def get_ensemble_prediction(fighter_a: str, fighter_b: str, model_type: str = "e
             fighter_b=fighter_b,
             model=model_type,
             predicted_winner=predicted_winner,
-            fighter_a_prob=round(final_prob * 100, 1),
-            fighter_b_prob=round((1 - final_prob) * 100, 1),
+            fighter_a_prob=float(round(final_prob * 100, 1)),
+            fighter_b_prob=float(round((1 - final_prob) * 100, 1)),
             draw_prob=0.0,  # Current models don't predict draws
-            penalty_score=ml_result.get("penalty_score") if model_type != "sim" else None,
-            weight_diff=diffs.get("weight_diff") if model_type != "sim" else None,
-            height_diff=diffs.get("height_diff") if model_type != "sim" else None,
-            reach_diff=diffs.get("reach_diff") if model_type != "sim" else None,
-            age_diff=diffs.get("age_diff") if model_type != "sim" else None
+            penalty_score=float(ml_result.get("penalty_score")) if ml_result.get("penalty_score") is not None and model_type != "sim" else None,
+            weight_diff=int(diffs.get("weight_diff")) if diffs.get("weight_diff") is not None and model_type != "sim" else None,
+            height_diff=int(diffs.get("height_diff")) if diffs.get("height_diff") is not None and model_type != "sim" else None,
+            reach_diff=int(diffs.get("reach_diff")) if diffs.get("reach_diff") is not None and model_type != "sim" else None,
+            age_diff=int(diffs.get("age_diff")) if diffs.get("age_diff") is not None and model_type != "sim" else None
         )
 
     return {

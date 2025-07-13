@@ -40,7 +40,7 @@ def simulate_fight(P_A, P_B, P_neutral, num_rounds, name_A=None, name_B=None, nu
     n_D = outcomes.count("Draw")
 
     return {
-        name_A: (n_A / num_simulations) * 100,
-        name_B: (n_B / num_simulations) * 100,
-        "Draw": (n_D / num_simulations) * 100
+        name_A: float((n_A / num_simulations) * 100),
+        name_B: float((n_B / num_simulations) * 100),
+        "Draw": float((n_D / num_simulations) * 100)
     }

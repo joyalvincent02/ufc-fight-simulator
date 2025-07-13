@@ -128,13 +128,13 @@ def predict_fight_outcome(name_a, name_b):
     return {
         "fighter_a": name_a,
         "fighter_b": name_b,
-        "fighter_a_win_prob": round(prob[1] * 100, 1),
-        "fighter_b_win_prob": round(prob[0] * 100, 1),
-        "penalty_score": round(penalty_score, 3),
+        "fighter_a_win_prob": float(round(prob[1] * 100, 1)),
+        "fighter_b_win_prob": float(round(prob[0] * 100, 1)),
+        "penalty_score": float(round(penalty_score, 3)),
         "diffs": {
-            "weight_diff": weight_diff,
-            "height_diff": height_diff,
-            "reach_diff": reach_diff,
-            "age_diff": age_diff
+            "weight_diff": int(weight_diff),
+            "height_diff": int(height_diff),
+            "reach_diff": int(reach_diff),
+            "age_diff": int(age_diff)
         }
     }

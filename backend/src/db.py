@@ -115,19 +115,30 @@ def log_prediction(
                 print(f"Prediction already exists for {fighter_a} vs {fighter_b} ({model}), skipping...")
                 return existing.id
         
+        # Ensure all numeric values are native Python types (not numpy)
+        def safe_convert_float(value):
+            if value is None:
+                return None
+            return float(value) if hasattr(value, 'item') else float(value)
+        
+        def safe_convert_int(value):
+            if value is None:
+                return None
+            return int(value) if hasattr(value, 'item') else int(value)
+        
         prediction = ModelPrediction(
             fighter_a=fighter_a,
             fighter_b=fighter_b,
             model=model,
             predicted_winner=predicted_winner,
-            fighter_a_prob=fighter_a_prob,
-            fighter_b_prob=fighter_b_prob,
-            draw_prob=draw_prob,
-            penalty_score=penalty_score,
-            weight_diff=weight_diff,
-            height_diff=height_diff,
-            reach_diff=reach_diff,
-            age_diff=age_diff,
+            fighter_a_prob=safe_convert_float(fighter_a_prob),
+            fighter_b_prob=safe_convert_float(fighter_b_prob),
+            draw_prob=safe_convert_float(draw_prob),
+            penalty_score=safe_convert_float(penalty_score),
+            weight_diff=safe_convert_int(weight_diff),
+            height_diff=safe_convert_int(height_diff),
+            reach_diff=safe_convert_int(reach_diff),
+            age_diff=safe_convert_int(age_diff),
             timestamp=datetime.utcnow()
         )
         db.add(prediction)
@@ -136,6 +147,11 @@ def log_prediction(
     except Exception as e:
         db.rollback()
         print(f"Error logging prediction: {e}")
+        # Print detailed type information for debugging
+        import numpy as np
+        print(f"Type debugging - fighter_a_prob: {type(fighter_a_prob)}, value: {fighter_a_prob}")
+        if hasattr(fighter_a_prob, 'dtype'):
+            print(f"NumPy dtype: {fighter_a_prob.dtype}")
         return None
     finally:
         db.close()
