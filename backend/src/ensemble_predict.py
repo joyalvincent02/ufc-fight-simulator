@@ -38,14 +38,43 @@ def get_ensemble_prediction(fighter_a: str, fighter_b: str, model_type: str = "e
         # Fallback if fighters not found
         sim_prob = 0.5
 
-    # Blend
+    # Calculate confidence scores for each model
+    def calculate_confidence(prob):
+        """Calculate confidence based on how far from 0.5 (neutral) the probability is"""
+        return abs(prob - 0.5) * 2  # Scale to 0-1 range
+    
+    ml_confidence = calculate_confidence(ml_prob)
+    sim_confidence = calculate_confidence(sim_prob)
+    
+    # Blend predictions based on model type
     if model_type == "ml":
         final_prob = ml_prob
     elif model_type == "sim":
         final_prob = sim_prob
     else:
-        # Weighted average (60% ML, 40% Sim)
-        final_prob = 0.6 * ml_prob + 0.4 * sim_prob
+        # Confidence-weighted ensemble
+        if ml_confidence + sim_confidence > 0:
+            # Weight models by their confidence levels
+            ml_weight = ml_confidence / (ml_confidence + sim_confidence)
+            sim_weight = sim_confidence / (ml_confidence + sim_confidence)
+            
+            # Apply base weights adjusted by confidence
+            base_ml_weight = 0.6  # Favor ML model slightly
+            base_sim_weight = 0.4
+            
+            # Combine base weights with confidence weights
+            final_ml_weight = (base_ml_weight + ml_weight) / 2
+            final_sim_weight = (base_sim_weight + sim_weight) / 2
+            
+            # Normalize weights
+            total_weight = final_ml_weight + final_sim_weight
+            final_ml_weight /= total_weight
+            final_sim_weight /= total_weight
+            
+            final_prob = final_ml_weight * ml_prob + final_sim_weight * sim_prob
+        else:
+            # Fallback to simple average if both models are uncertain
+            final_prob = 0.5
 
     # Determine predicted winner
     predicted_winner = fighter_a if final_prob > 0.5 else fighter_b

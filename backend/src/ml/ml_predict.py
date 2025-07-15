@@ -63,7 +63,7 @@ def predict_fight_outcome(name_a, name_b):
     reach_diff = f1_reach - f2_reach
     age_diff = compute_age(f1.dob) - compute_age(f2.dob)
 
-    # Build feature vector
+    # Build feature vector with enhanced features
     features = {
         "f1_slpm": safe(f1.slpm),
         "f1_str_acc": safe(f1.str_acc),
@@ -83,6 +83,29 @@ def predict_fight_outcome(name_a, name_b):
         "height_diff": height_diff,
         "weight_diff": weight_diff,
         "age_diff": age_diff,
+        
+        # Enhanced ratio features
+        "slpm_ratio": safe(f1.slpm) / max(safe(f2.slpm), 0.1),
+        "str_acc_ratio": safe(f1.str_acc) / max(safe(f2.str_acc), 0.1),
+        "str_def_ratio": safe(f1.str_def) / max(safe(f2.str_def), 0.1),
+        "td_avg_ratio": safe(f1.td_avg) / max(safe(f2.td_avg), 0.1),
+        "td_acc_ratio": safe(f1.td_acc) / max(safe(f2.td_acc), 0.1),
+        "td_def_ratio": safe(f1.td_def) / max(safe(f2.td_def), 0.1),
+        "sub_avg_ratio": safe(f1.sub_avg) / max(safe(f2.sub_avg), 0.1),
+        
+        # Physical advantage features
+        "reach_advantage": 1 if reach_diff > 2 else 0,
+        "height_advantage": 1 if height_diff > 2 else 0,
+        "weight_advantage": 1 if weight_diff > 5 else 0,
+        "age_advantage": 1 if age_diff < -2 else 0,  # Younger is better
+        
+        # Combined striking effectiveness
+        "f1_striking_score": safe(f1.slpm) * safe(f1.str_acc) * safe(f1.str_def),
+        "f2_striking_score": safe(f2.slpm) * safe(f2.str_acc) * safe(f2.str_def),
+        
+        # Combined grappling effectiveness  
+        "f1_grappling_score": safe(f1.td_avg) * safe(f1.td_acc) * safe(f1.td_def),
+        "f2_grappling_score": safe(f2.td_avg) * safe(f2.td_acc) * safe(f2.td_def)
     }
 
     # Add one-hot encoded stance features
@@ -128,8 +151,8 @@ def predict_fight_outcome(name_a, name_b):
     return {
         "fighter_a": name_a,
         "fighter_b": name_b,
-        "fighter_a_win_prob": float(round(prob[1] * 100, 1)),
-        "fighter_b_win_prob": float(round(prob[0] * 100, 1)),
+        "fighter_a_win_prob": float(round(prob[1] * 100, 1)),  # prob[1] is fighter_a win (class 1)
+        "fighter_b_win_prob": float(round(prob[0] * 100, 1)),  # prob[0] is fighter_b win (class 0)
         "penalty_score": float(round(penalty_score, 3)),
         "diffs": {
             "weight_diff": int(weight_diff),

@@ -83,6 +83,30 @@ def build_dataset():
     df["height_diff"] = df["f1_height"] - df["f2_height"]
     df["weight_diff"] = df["f1_weight"] - df["f2_weight"]
     df["age_diff"] = df["f1_age"] - df["f2_age"]
+    
+    # Add enhanced ratio features
+    def safe_divide(a, b):
+        return a / b.where(b > 0.1, 0.1)
+    
+    df["slpm_ratio"] = safe_divide(df["f1_slpm"], df["f2_slpm"])
+    df["str_acc_ratio"] = safe_divide(df["f1_str_acc"], df["f2_str_acc"])
+    df["str_def_ratio"] = safe_divide(df["f1_str_def"], df["f2_str_def"])
+    df["td_avg_ratio"] = safe_divide(df["f1_td_avg"], df["f2_td_avg"])
+    df["td_acc_ratio"] = safe_divide(df["f1_td_acc"], df["f2_td_acc"])
+    df["td_def_ratio"] = safe_divide(df["f1_td_def"], df["f2_td_def"])
+    df["sub_avg_ratio"] = safe_divide(df["f1_sub_avg"], df["f2_sub_avg"])
+    
+    # Physical advantage features
+    df["reach_advantage"] = (df["reach_diff"] > 2).astype(int)
+    df["height_advantage"] = (df["height_diff"] > 2).astype(int)
+    df["weight_advantage"] = (df["weight_diff"] > 5).astype(int)
+    df["age_advantage"] = (df["age_diff"] < -2).astype(int)  # Younger is better
+    
+    # Combined effectiveness scores
+    df["f1_striking_score"] = df["f1_slpm"] * df["f1_str_acc"] * df["f1_str_def"]
+    df["f2_striking_score"] = df["f2_slpm"] * df["f2_str_acc"] * df["f2_str_def"]
+    df["f1_grappling_score"] = df["f1_td_avg"] * df["f1_td_acc"] * df["f1_td_def"]
+    df["f2_grappling_score"] = df["f2_td_avg"] * df["f2_td_acc"] * df["f2_td_def"]
 
     # One-hot encode stance combinations
     df = pd.get_dummies(df, columns=["f1_stance", "f2_stance"], dummy_na=True)
