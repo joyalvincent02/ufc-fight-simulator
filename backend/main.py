@@ -17,9 +17,13 @@ import re
 import json
 import os
 import traceback
+import logging
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 def to_stats_obj(d):
     return SimpleNamespace(**d)
@@ -489,6 +493,17 @@ def resume_scheduler():
         return {"message": "Scheduler resumed successfully"}
     except Exception as e:
         return {"error": str(e)}
+
+@app.post("/retrain-ml-model")
+def retrain_ml_model_endpoint(min_new_results: int = Query(5, description="Minimum new results required to trigger retraining")):
+    """Manual trigger to retrain the ML model with latest fight results"""
+    try:
+        scheduler = get_scheduler()
+        result = scheduler.retrain_ml_model_manual(min_new_results)
+        return result
+    except Exception as e:
+        logger.error(f"ML retraining endpoint failed: {e}")
+        return {"error": str(e), "retrained": False}
 
 # Debug endpoints - only available in development
 if os.getenv("ENVIRONMENT", "production").lower() != "production":

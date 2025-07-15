@@ -1,0 +1,45 @@
+name: Keep Azure App Warm
+
+on:
+  schedule:
+    # Every 15 minutes during peak hours (6 AM - 10 PM UTC)
+    - cron: '*/15 6-22 * * *'
+    # Every 30 minutes during off-peak hours (10 PM - 6 AM UTC)
+    - cron: '*/30 22-23,0-5 * * *'
+  
+  # Manual trigger
+  workflow_dispatch:
+
+jobs:
+  keep-warm:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Ping Health Endpoint
+      run: |
+        echo "🏃‍♂️ Keeping Azure App Service warm..."
+        echo "🕒 Current time: $(date -u)"
+        
+        # Simple health check to prevent app from sleeping
+        response=$(curl -s -w "%{http_code}" -m 30 "${{ secrets.AZURE_APP_URL }}/health")
+        
+        if [ "$response" = "200" ]; then
+          echo "✅ App is healthy and warm"
+        elif [[ "$response" =~ ^[0-9]{3}$ ]]; then
+          echo "⚠️ App responded with HTTP $response"
+        else
+          echo "❌ App may be sleeping or unreachable"
+        fi
+        
+        # Quick status check (lightweight)
+        status_response=$(curl -s -w "%{http_code}" -m 15 "${{ secrets.AZURE_APP_URL }}/scheduler/status" | tail -c 3)
+        
+        if [ "$status_response" = "200" ]; then
+          echo "📊 Scheduler status check: OK"
+        else
+          echo "📊 Scheduler status check: HTTP $status_response"
+        fi
+
+    - name: Log Activity
+      run: |
+        echo "📝 Keep-warm activity logged at $(date -u)" >> $GITHUB_STEP_SUMMARY

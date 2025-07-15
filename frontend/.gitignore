@@ -7,10 +7,30 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
+
+# Build output
 dist
 dist-ssr
 *.local
+
+# Environment variables (CRITICAL)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+# But allow .env.example
+!.env.example
+
+# TypeScript build info
+*.tsbuildinfo
+.tmp/
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
 
 # Editor directories and files
 .vscode/*
@@ -22,5 +42,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+*.bak
+*.tmp
+*~
 
-.env
+# OS generated files
+Thumbs.db
+ehthumbs.db
+
+# Azure Static Web Apps CLI configuration file
+staticwebapp.config.json

@@ -64,6 +64,7 @@ class UFCScheduler:
         self.last_profile_update = None
         self.last_result_check = None
         self.last_cleanup = None
+        self.last_ml_retrain = None
         
         # Load persisted timestamps from database
         self._load_timestamps()
@@ -89,61 +90,44 @@ class UFCScheduler:
                 logger.error(f"Error during scheduler shutdown: {e}")
     
     def _setup_jobs(self):
-        """Setup all scheduled jobs with AEST timezone converted to UTC"""
+        """Setup jobs optimized for Azure Free Tier (manual triggers only)"""
         try:
-            # Wednesday 12PM AEST = Wednesday 2AM UTC
-            # New Event Detection
-            self.scheduler.add_job(
-                func=job_check_new_events,
-                trigger='cron',
-                day_of_week='wed',
-                hour=2,
-                minute=0,
-                id='check_new_events',
-                name='Check for New UFC Events',
-                replace_existing=True
-            )
+            # NOTE: Azure Free Tier doesn't support Always On, so automatic scheduling is disabled
+            # All jobs must be triggered manually via API endpoints or external schedulers
             
-            # Wednesday 12PM AEST = Wednesday 2AM UTC
-            # Fighter Profile Updates
-            self.scheduler.add_job(
-                func=job_update_fighter_profiles,
-                trigger='cron',
-                day_of_week='wed',
-                hour=2,
-                minute=30,  # 30 minutes after event check
-                id='update_fighter_profiles',
-                name='Update Fighter Profiles',
-                replace_existing=True
-            )
+            logger.info("⚠️  AZURE FREE TIER: Automatic scheduling disabled")
+            logger.info("📋 Use these manual endpoints instead:")
+            logger.info("   POST /check-new-events - Check for new UFC events")
+            logger.info("   POST /check-completed-events - Update fight results") 
+            logger.info("   POST /retrain-ml-model - Retrain ML model")
+            logger.info("   GET /scheduler/status - Check scheduler status")
+            logger.info("💡 Consider using GitHub Actions or external CRON for automation")
             
-            # Sunday 4PM AEST = Sunday 6AM UTC
-            # Result Checking (after weekend events)
-            self.scheduler.add_job(
-                func=job_check_completed_events,
-                trigger='cron',
-                day_of_week='sun',
-                hour=6,
-                minute=0,
-                id='check_completed_events',
-                name='Check Completed Events',
-                replace_existing=True
-            )
+            # Jobs are commented out but kept for reference when upgrading to paid tier
+            # Uncomment these when moving to Azure Pro/Standard with Always On enabled
             
-            # Monthly cleanup on first Wednesday of month at 3AM UTC
-            self.scheduler.add_job(
-                func=job_cleanup_old_predictions,
-                trigger='cron',
-                day='1-7',
-                day_of_week='wed',
-                hour=3,
-                minute=0,
-                id='cleanup_predictions',
-                name='Cleanup Old Predictions',
-                replace_existing=True
-            )
+            # self.scheduler.add_job(
+            #     func=job_check_new_events,
+            #     trigger='cron', day_of_week='wed', hour=2, minute=0,
+            #     id='check_new_events', name='Check for New UFC Events',
+            #     replace_existing=True
+            # )
             
-            logger.info("All scheduled jobs configured successfully")
+            # self.scheduler.add_job(
+            #     func=job_check_completed_events,
+            #     trigger='cron', day_of_week='sun', hour=6, minute=0,
+            #     id='check_completed_events', name='Check Completed Events',
+            #     replace_existing=True
+            # )
+            
+            # self.scheduler.add_job(
+            #     func=job_retrain_ml_model,
+            #     trigger='cron', day_of_week='mon', hour=4, minute=0,
+            #     id='retrain_ml_model', name='Retrain ML Model',
+            #     replace_existing=True
+            # )
+            
+            logger.info("Manual-only scheduler configured for Azure Free Tier")
             
         except Exception as e:
             logger.error(f"Failed to setup jobs: {e}")
@@ -470,6 +454,13 @@ class UFCScheduler:
                 self.last_cleanup = datetime.fromisoformat(last_cleanup)
             except ValueError:
                 self.last_cleanup = None
+                
+        last_ml_retrain = self._load_metadata('last_ml_retrain')
+        if last_ml_retrain:
+            try:
+                self.last_ml_retrain = datetime.fromisoformat(last_ml_retrain)
+            except ValueError:
+                self.last_ml_retrain = None
     
     def get_status(self):
         """Get scheduler status and last update times"""
@@ -488,7 +479,8 @@ class UFCScheduler:
             'last_event_check': self.last_event_check.isoformat() if self.last_event_check else None,
             'last_profile_update': self.last_profile_update.isoformat() if self.last_profile_update else None,
             'last_result_check': self.last_result_check.isoformat() if self.last_result_check else None,
-            'last_cleanup': self.last_cleanup.isoformat() if self.last_cleanup else None
+            'last_cleanup': self.last_cleanup.isoformat() if self.last_cleanup else None,
+            'last_ml_retrain': self.last_ml_retrain.isoformat() if self.last_ml_retrain else None
         }
     
     def _job_executed(self, event):
@@ -503,7 +495,79 @@ class UFCScheduler:
     def _job_missed(self, event):
         """Handle missed job executions"""
         logger.warning(f"Job '{event.job_id}' was missed")
+    
+    def _retrain_ml_model(self, min_new_results: int = 10):
+        """Retrain the ML model if sufficient new results are available"""
+        try:
+            logger.info("Checking if ML model retraining is needed...")
+            
+            db = SessionLocal()
+            
+            # Check how many new results we have since last retraining
+            last_retrain = self._load_metadata('last_ml_retrain')
+            if last_retrain:
+                last_retrain_date = datetime.fromisoformat(last_retrain)
+                new_results_count = db.query(ModelPrediction).filter(
+                    ModelPrediction.actual_winner.is_not(None),
+                    ModelPrediction.timestamp > last_retrain_date
+                ).count()
+            else:
+                # First time - count all results
+                new_results_count = db.query(ModelPrediction).filter(
+                    ModelPrediction.actual_winner.is_not(None)
+                ).count()
+            
+            db.close()
+            
+            logger.info(f"Found {new_results_count} new fight results since last retraining")
+            
+            if new_results_count < min_new_results:
+                logger.info(f"Not enough new results ({new_results_count} < {min_new_results}), skipping retraining")
+                return {"message": f"Insufficient new results ({new_results_count} < {min_new_results})", "retrained": False}
+            
+            # Trigger retraining process
+            logger.info(f"Retraining ML model with {new_results_count} new results...")
+            
+            # Step 1: Rebuild dataset
+            from src.ml.prepare_ml_dataset import build_dataset
+            build_dataset()
+            logger.info("Dataset rebuilt with latest results")
+            
+            # Step 2: Retrain model
+            from src.ml.train_model import retrain_model
+            model_metrics = retrain_model()
+            logger.info(f"Model retrained successfully: {model_metrics}")
+            
+            # Step 3: Update timestamp
+            timestamp = datetime.utcnow()
+            self.last_ml_retrain = timestamp
+            self._save_metadata('last_ml_retrain', timestamp.isoformat())
+            
+            return {
+                "message": f"ML model retrained with {new_results_count} new results",
+                "retrained": True,
+                "new_results_count": new_results_count,
+                "model_metrics": model_metrics,
+                "timestamp": timestamp.isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error during ML model retraining: {e}")
+            logger.error(traceback.format_exc())
+            return {"error": str(e), "retrained": False}
 
+    def retrain_ml_model_manual(self, min_new_results: int = 5):
+        """Manual trigger for ML model retraining (called from API)"""
+        try:
+            logger.info("Manual trigger: ML model retraining...")
+            result = self._retrain_ml_model(min_new_results)
+            return result
+        except Exception as e:
+            logger.error(f"Manual ML retraining failed: {e}")
+            return {"error": str(e), "retrained": False}
+
+    # ...existing code...
+    
 
 # Module-level job functions (can be serialized)
 def job_check_new_events():
@@ -860,6 +924,71 @@ def job_cleanup_old_predictions():
         
     except Exception as e:
         logger.error(f"Error during cleanup job: {e}")
+        logger.error(traceback.format_exc())
+
+def job_retrain_ml_model():
+    """Job function for retraining the ML model"""
+    try:
+        logger.info("Starting ML model retraining job...")
+        
+        # Check how many new results we have
+        db = SessionLocal()
+        
+        # Get scheduler instance to check last retrain time
+        scheduler = get_scheduler()
+        last_retrain = scheduler._load_metadata('last_ml_retrain')
+        min_new_results = 10  # Require at least 10 new results
+        
+        if last_retrain:
+            last_retrain_date = datetime.fromisoformat(last_retrain)
+            new_results_count = db.query(ModelPrediction).filter(
+                ModelPrediction.actual_winner.is_not(None),
+                ModelPrediction.timestamp > last_retrain_date
+            ).count()
+        else:
+            # First time - count all results
+            new_results_count = db.query(ModelPrediction).filter(
+                ModelPrediction.actual_winner.is_not(None)
+            ).count()
+        
+        db.close()
+        
+        logger.info(f"Found {new_results_count} new fight results since last retraining")
+        
+        if new_results_count < min_new_results:
+            logger.info(f"Not enough new results ({new_results_count} < {min_new_results}), skipping retraining")
+            return
+        
+        # Trigger retraining process
+        logger.info(f"Retraining ML model with {new_results_count} new results...")
+        
+        # Step 1: Rebuild dataset
+        from src.ml.prepare_ml_dataset import build_dataset
+        build_dataset()
+        logger.info("Dataset rebuilt with latest results")
+        
+        # Step 2: Retrain model
+        try:
+            from src.ml.train_model import retrain_model
+            model_metrics = retrain_model()
+            logger.info(f"Model retrained successfully: {model_metrics}")
+        except ImportError as e:
+            logger.error(f"Missing ML dependencies for retraining: {e}")
+            logger.error("Please install required packages: pip install scikit-learn pandas joblib")
+            return
+        except Exception as e:
+            logger.error(f"Error during model retraining: {e}")
+            return
+        
+        # Step 3: Update timestamp
+        timestamp = datetime.utcnow()
+        scheduler.last_ml_retrain = timestamp
+        scheduler._save_metadata('last_ml_retrain', timestamp.isoformat())
+        
+        logger.info(f"ML model retraining completed with {new_results_count} new results")
+        
+    except Exception as e:
+        logger.error(f"Error in ML model retraining job: {e}")
         logger.error(traceback.format_exc())
 
 

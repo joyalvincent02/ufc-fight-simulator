@@ -1,0 +1,69 @@
+name: UFC Quick Actions
+
+on:
+  # Manual trigger only
+  workflow_dispatch:
+    inputs:
+      endpoint:
+        description: 'Endpoint to call'
+        required: true
+        default: '/health'
+        type: choice
+        options:
+        - /health
+        - /scheduler/status
+        - /check-new-events
+        - /check-completed-events
+        - /retrain-ml-model
+
+jobs:
+  quick-action:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Execute UFC Action
+      run: |
+        echo "🎯 Calling endpoint: ${{ github.event.inputs.endpoint }}"
+        
+        # Wake up the app first
+        echo "🌅 Waking up Azure App..."
+        curl -f -m 30 "${{ secrets.AZURE_APP_URL }}/health" || echo "App might be sleeping"
+        sleep 5
+        
+        # Determine HTTP method
+        if [[ "${{ github.event.inputs.endpoint }}" == "/health" || "${{ github.event.inputs.endpoint }}" == "/scheduler/status" ]]; then
+          method="GET"
+        else
+          method="POST"
+        fi
+        
+        echo "📤 Making $method request to ${{ github.event.inputs.endpoint }}"
+        
+        # Make the request
+        if [ "$method" = "GET" ]; then
+          response=$(curl -s -w "\n%{http_code}" "${{ secrets.AZURE_APP_URL }}${{ github.event.inputs.endpoint }}")
+        else
+          response=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.AZURE_APP_URL }}${{ github.event.inputs.endpoint }}")
+        fi
+        
+        http_code=$(echo "$response" | tail -n1)
+        body=$(echo "$response" | head -n -1)
+        
+        echo "📊 Response Code: $http_code"
+        echo "📝 Response:"
+        echo "$body" | jq . 2>/dev/null || echo "$body"
+        
+        if [ "$http_code" -eq 200 ]; then
+          echo "✅ Request successful!"
+        else
+          echo "❌ Request failed (HTTP $http_code)"
+          exit 1
+        fi
+
+    - name: Create Summary
+      run: |
+        echo "## 🎯 Quick Action Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Endpoint:** \`${{ github.event.inputs.endpoint }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "**Time:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+        echo "**Status:** ✅ Success" >> $GITHUB_STEP_SUMMARY

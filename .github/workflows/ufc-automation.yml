@@ -1,0 +1,175 @@
+name: UFC Fight Simulator Automation
+
+on:
+  schedule:
+    # Monday 4AM UTC - ML Model Retraining (after weekend events)
+    - cron: '0 4 * * 1'
+    # Wednesday 2AM UTC - Check for New Events
+    - cron: '0 2 * * 3'
+    # Sunday 6AM UTC - Check Completed Events (after weekend fights)
+    - cron: '0 6 * * 0'
+  
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'check-events'
+        type: choice
+        options:
+        - check-events
+        - check-results
+        - retrain-model
+        - all
+
+jobs:
+  ufc-automation:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set up job context
+      id: context
+      run: |
+        # Determine which action to run based on schedule or manual input
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "action=${{ github.event.inputs.action }}" >> $GITHUB_OUTPUT
+        elif [ "${{ github.event.schedule }}" = "0 4 * * 1" ]; then
+          echo "action=retrain-model" >> $GITHUB_OUTPUT
+        elif [ "${{ github.event.schedule }}" = "0 2 * * 3" ]; then
+          echo "action=check-events" >> $GITHUB_OUTPUT
+        elif [ "${{ github.event.schedule }}" = "0 6 * * 0" ]; then
+          echo "action=check-results" >> $GITHUB_OUTPUT
+        else
+          echo "action=check-events" >> $GITHUB_OUTPUT
+        fi
+        
+        echo "🤖 UFC Automation triggered"
+        echo "📅 Current time: $(date -u)"
+        echo "🎯 Action: $(echo '${{ steps.context.outputs.action }}')"
+
+    - name: Wait for Azure App to wake up
+      run: |
+        echo "🌅 Waking up Azure App Service..."
+        # Ping the health endpoint to wake up the app
+        curl -f -m 30 "${{ secrets.AZURE_APP_URL }}/health" || echo "⚠️ App might be sleeping, continuing anyway..."
+        sleep 10
+
+    - name: Check UFC Scheduler Status
+      run: |
+        echo "📊 Checking scheduler status..."
+        curl -f "${{ secrets.AZURE_APP_URL }}/scheduler/status" || echo "⚠️ Status check failed"
+
+    - name: Check for New UFC Events
+      if: steps.context.outputs.action == 'check-events' || steps.context.outputs.action == 'all'
+      run: |
+        echo "🥊 Checking for new UFC events..."
+        response=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.AZURE_APP_URL }}/check-new-events")
+        http_code=$(echo "$response" | tail -n1)
+        body=$(echo "$response" | head -n -1)
+        
+        echo "📤 Response Code: $http_code"
+        echo "📝 Response Body: $body"
+        
+        if [ "$http_code" -eq 200 ]; then
+          echo "✅ Successfully checked for new events"
+        else
+          echo "❌ Failed to check events (HTTP $http_code)"
+          exit 1
+        fi
+
+    - name: Check Completed Events
+      if: steps.context.outputs.action == 'check-results' || steps.context.outputs.action == 'all'
+      run: |
+        echo "🏆 Checking completed fight results..."
+        response=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.AZURE_APP_URL }}/check-completed-events")
+        http_code=$(echo "$response" | tail -n1)
+        body=$(echo "$response" | head -n -1)
+        
+        echo "📤 Response Code: $http_code"
+        echo "📝 Response Body: $body"
+        
+        if [ "$http_code" -eq 200 ]; then
+          echo "✅ Successfully checked completed events"
+          # Parse and display useful info
+          updated=$(echo "$body" | grep -o '"updated_predictions":[0-9]*' | cut -d':' -f2 || echo "0")
+          pending=$(echo "$body" | grep -o '"pending_predictions":[0-9]*' | cut -d':' -f2 || echo "0")
+          echo "📊 Updated predictions: $updated"
+          echo "⏳ Pending predictions: $pending"
+        else
+          echo "❌ Failed to check results (HTTP $http_code)"
+          exit 1
+        fi
+
+    - name: Retrain ML Model
+      if: steps.context.outputs.action == 'retrain-model' || steps.context.outputs.action == 'all'
+      run: |
+        echo "🧠 Triggering ML model retraining..."
+        # Use lower threshold for manual/scheduled retraining
+        response=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.AZURE_APP_URL }}/retrain-ml-model?min_new_results=5")
+        http_code=$(echo "$response" | tail -n1)
+        body=$(echo "$response" | head -n -1)
+        
+        echo "📤 Response Code: $http_code"
+        echo "📝 Response Body: $body"
+        
+        if [ "$http_code" -eq 200 ]; then
+          echo "✅ ML retraining request successful"
+          # Parse and display training results
+          retrained=$(echo "$body" | grep -o '"retrained":[^,]*' | cut -d':' -f2 || echo "false")
+          if [ "$retrained" = "true" ]; then
+            echo "🎯 Model was retrained!"
+            new_results=$(echo "$body" | grep -o '"new_results_count":[0-9]*' | cut -d':' -f2 || echo "0")
+            echo "📈 New results used: $new_results"
+          else
+            echo "⏭️ Model retraining skipped (insufficient new data)"
+          fi
+        else
+          echo "❌ Failed to trigger retraining (HTTP $http_code)"
+          exit 1
+        fi
+
+    - name: Final Status Check
+      run: |
+        echo "🏁 Final scheduler status check..."
+        response=$(curl -s "${{ secrets.AZURE_APP_URL }}/scheduler/status")
+        echo "📊 Final Status: $response"
+        
+        # Extract and display last update times
+        echo "⏰ Last Updates:"
+        echo "$response" | grep -o '"last_[^"]*":"[^"]*"' | while read -r line; do
+          key=$(echo "$line" | cut -d'"' -f2)
+          value=$(echo "$line" | cut -d'"' -f4)
+          if [ "$value" != "null" ]; then
+            echo "  $key: $value"
+          fi
+        done
+
+    - name: Create Summary
+      run: |
+        echo "## 🥊 UFC Automation Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Action:** ${{ steps.context.outputs.action }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Time:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+        echo "**Status:** ✅ Completed Successfully" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔗 Quick Links" >> $GITHUB_STEP_SUMMARY
+        echo "- [UFC Fight Simulator](${{ secrets.AZURE_APP_URL }})" >> $GITHUB_STEP_SUMMARY
+        echo "- [Scheduler Status](${{ secrets.AZURE_APP_URL }}/scheduler/status)" >> $GITHUB_STEP_SUMMARY
+        echo "- [Health Check](${{ secrets.AZURE_APP_URL }}/health)" >> $GITHUB_STEP_SUMMARY
+
+  # Notify on failure
+  notify-failure:
+    runs-on: ubuntu-latest
+    needs: ufc-automation
+    if: failure()
+    
+    steps:
+    - name: Notify Failure
+      run: |
+        echo "❌ UFC Automation failed!"
+        echo "🔍 Check the workflow logs for details"
+        echo "⚠️ Manual intervention may be required"
