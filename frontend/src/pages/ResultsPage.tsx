@@ -168,12 +168,12 @@ export default function ResultsPage() {
                     <SchedulerStatus />
                 </div>
 
-                {/* Model Comparison */}
+                {/* Model Performance Overview */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                     <div className="bg-white/80 dark:bg-black/20 rounded-xl border border-gray-200 dark:border-white/10 p-6">
                         <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                             <BarChartIcon />
-                            Model Comparison
+                            Model Performance & Auto-Retraining
                         </h3>
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
@@ -185,7 +185,7 @@ export default function ResultsPage() {
                                             style={{ width: `${performance?.model_breakdown.ml.accuracy || 0}%` }}
                                         />
                                     </div>
-                                    <Tooltip content={`${performance?.model_breakdown.ml.correct || 0}/${performance?.model_breakdown.ml.total_with_results || 0} correct\n${performance?.model_breakdown.ml.total || 0} total predictions\n${(performance?.model_breakdown.ml.total || 0) - (performance?.model_breakdown.ml.total_with_results || 0)} pending results`}>
+                                    <Tooltip content={`${performance?.model_breakdown.ml.correct || 0}/${performance?.model_breakdown.ml.total_with_results || 0} correct\n${performance?.model_breakdown.ml.total || 0} total predictions\n${(performance?.model_breakdown.ml.total || 0) - (performance?.model_breakdown.ml.total_with_results || 0)} pending results\n\nTraining: ${performance?.predictions_with_results || 0} samples\nHealth: ${(performance?.predictions_with_results || 0) >= 50 ? 'Well Trained' : (performance?.predictions_with_results || 0) >= 20 ? 'Learning' : 'Need More Data'}`}>
                                         <span className="text-gray-900 dark:text-white font-medium w-12 cursor-help">
                                             {performance?.model_breakdown.ml.accuracy.toFixed(1)}%
                                         </span>
@@ -201,7 +201,7 @@ export default function ResultsPage() {
                                             style={{ width: `${performance?.model_breakdown.ensemble.accuracy || 0}%` }}
                                         />
                                     </div>
-                                    <Tooltip content={`${performance?.model_breakdown.ensemble.correct || 0}/${performance?.model_breakdown.ensemble.total_with_results || 0} correct\n${performance?.model_breakdown.ensemble.total || 0} total predictions\n${(performance?.model_breakdown.ensemble.total || 0) - (performance?.model_breakdown.ensemble.total_with_results || 0)} pending results`}>
+                                    <Tooltip content={`${performance?.model_breakdown.ensemble.correct || 0}/${performance?.model_breakdown.ensemble.total_with_results || 0} correct\n${performance?.model_breakdown.ensemble.total || 0} total predictions\n${(performance?.model_breakdown.ensemble.total || 0) - (performance?.model_breakdown.ensemble.total_with_results || 0)} pending results\n\nCombines ML + Simulation for better accuracy`}>
                                         <span className="text-gray-900 dark:text-white font-medium w-12 cursor-help">
                                             {performance?.model_breakdown.ensemble.accuracy.toFixed(1)}%
                                         </span>
@@ -217,12 +217,21 @@ export default function ResultsPage() {
                                             style={{ width: `${performance?.model_breakdown.sim.accuracy || 0}%` }}
                                         />
                                     </div>
-                                    <Tooltip content={`${performance?.model_breakdown.sim.correct || 0}/${performance?.model_breakdown.sim.total_with_results || 0} correct\n${performance?.model_breakdown.sim.total || 0} total predictions\n${(performance?.model_breakdown.sim.total || 0) - (performance?.model_breakdown.sim.total_with_results || 0)} pending results`}>
+                                    <Tooltip content={`${performance?.model_breakdown.sim.correct || 0}/${performance?.model_breakdown.sim.total_with_results || 0} correct\n${performance?.model_breakdown.sim.total || 0} total predictions\n${(performance?.model_breakdown.sim.total || 0) - (performance?.model_breakdown.sim.total_with_results || 0)} pending results\n\nPhysics-based fight simulation`}>
                                         <span className="text-gray-900 dark:text-white font-medium w-12 cursor-help">
                                             {performance?.model_breakdown.sim.accuracy.toFixed(1)}%
                                         </span>
                                     </Tooltip>
                                 </div>
+                            </div>
+                        </div>
+                        
+                        {/* Auto-retraining info */}
+                        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-white/10">
+                            <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3">
+                                <p className="text-xs text-purple-700 dark:text-purple-300 text-center">
+                                    <strong>Auto-retrains:</strong> ML model updates when {(performance?.predictions_with_results || 0) < 50 ? '10' : '15'}+ new results available
+                                </p>
                             </div>
                         </div>
                     </div>
