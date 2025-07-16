@@ -14,17 +14,17 @@ def populate_fighters_from_event(event_url):
             existing = db.query(Fighter).filter(Fighter.name == name).first()
 
             if existing:
-                print(f"✅ {name} already in DB")
+                print(f"{name} already in DB")
             else:
-                print(f"🔍 Scraping {name}...")
+                print(f"Scraping {name}...")
                 stats = scrape_fighter_stats(name, url)
                 if stats:
                     save_fighter_to_db(stats)
                 else:
-                    print(f"⚠️ Failed to scrape stats for {name}")
+                    print(f"Failed to scrape stats for {name}")
 
     db.close()
-    print("\n🎉 DB population complete.\n")
+    print("\nDB population complete.\n")
 
 
 if __name__ == "__main__":

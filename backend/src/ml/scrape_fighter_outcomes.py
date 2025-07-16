@@ -13,9 +13,9 @@ from datetime import datetime
 def clean(text):
     return re.sub(r"\s+", " ", text.strip()) if text else None
 
-# 🔍 Extract fight outcomes from one fighter's UFCStats profile
+# Extract fight outcomes from one fighter's UFCStats profile
 def scrape_fighter_outcomes(url: str, fighter_name: str):
-    print(f"🔍 Scraping {fighter_name} ({url})")
+    print(f"Scraping {fighter_name} ({url})")
     response = requests.get(url)
     soup = BeautifulSoup(response.content, "html.parser")
 
@@ -29,7 +29,7 @@ def scrape_fighter_outcomes(url: str, fighter_name: str):
 
         result = clean(cols[0].text).lower()
 
-        # ✅ Get opponent name by comparing both fighter names in the column
+        # Get opponent name by comparing both fighter names in the column
         name_links = cols[1].select("a")
         if len(name_links) < 2:
             opponent = "Unknown"
@@ -99,7 +99,7 @@ def save_outcomes(db: Session, outcomes):
     
     db.commit()
 
-# 🚀 Main loop to scrape all fighters
+# Main loop to scrape all fighters
 def scrape_all_fighters():
     db = SessionLocal()
 
@@ -113,10 +113,10 @@ def scrape_all_fighters():
             save_outcomes(db, outcomes)
             time.sleep(0.5)  # Be polite to the server
         except Exception as e:
-            print(f"❌ Failed to scrape {fighter.name}: {e}")
+            print(f"Failed to scrape {fighter.name}: {e}")
 
     db.close()
-    print("✅ Finished scraping all fighters and updating predictions.")
+    print("Finished scraping all fighters and updating predictions.")
 
 if __name__ == "__main__":
     scrape_all_fighters()

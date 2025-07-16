@@ -7,7 +7,7 @@ def parse_dob(text):
     try:
         return datetime.strptime(text.strip(), "%b %d, %Y").date()
     except Exception as e:
-        print(f"❌ Failed to parse DOB: {text} — {e}")
+        print(f"Failed to parse DOB: {text} — {e}")
         return None
 
 
@@ -18,7 +18,7 @@ def scrape_fighter_stats(name: str, profile_url: str):
     def extract_stat(label_keyword):
         stat_section = soup.find("div", class_="b-list__info-box-left")
         if not stat_section:
-            print("❌ Could not find stat section.")
+            print("Could not find stat section.")
             return None
 
         for li in stat_section.find_all("li"):
@@ -81,11 +81,11 @@ def scrape_fighter_stats(name: str, profile_url: str):
 
         required = ["slpm", "str_acc", "str_def", "td_avg", "td_acc", "td_def", "sub_avg"]
         if any(stats[k] is None for k in required):
-            print(f"❌ Incomplete data for {name}, skipping.")
+            print(f"Incomplete data for {name}, skipping.")
             return None
 
     except Exception as e:
-        print(f"❌ Error parsing stats for {name}: {e}")
+        print(f"Error parsing stats for {name}: {e}")
         return None
 
     return stats
@@ -104,5 +104,5 @@ def save_fighter_to_db(fighter_data):
         fighter = Fighter(**fighter_data)
         db.add(fighter)
         db.commit()
-        print(f"✅ {fighter.name} added to DB.")
+        print(f"{fighter.name} added to DB.")
     db.close()

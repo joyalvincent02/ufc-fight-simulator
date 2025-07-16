@@ -36,8 +36,8 @@ def train_model(dataset_path="data/training_dataset.csv", model_path="src/ml/fig
         "cv_std": round(cv_scores.std(), 4)
     }
     
-    print(f"✅ Model saved to {model_path}")
-    print(f"📊 Metrics: {metrics}")
+    print(f"Model saved to {model_path}")
+    print(f"Metrics: {metrics}")
     
     return metrics
 

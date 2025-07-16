@@ -95,13 +95,13 @@ class UFCScheduler:
             # NOTE: Azure Free Tier doesn't support Always On, so automatic scheduling is disabled
             # All jobs must be triggered manually via API endpoints or external schedulers
             
-            logger.info("⚠️  AZURE FREE TIER: Automatic scheduling disabled")
-            logger.info("📋 Use these manual endpoints instead:")
+            logger.info("AZURE FREE TIER: Automatic scheduling disabled")
+            logger.info("Use these manual endpoints instead:")
             logger.info("   POST /check-new-events - Check for new UFC events")
             logger.info("   POST /check-completed-events - Update fight results") 
             logger.info("   POST /retrain-ml-model - Retrain ML model")
             logger.info("   GET /scheduler/status - Check scheduler status")
-            logger.info("💡 Consider using GitHub Actions or external CRON for automation")
+            logger.info("Consider using GitHub Actions or external CRON for automation")
             
             # Jobs are commented out but kept for reference when upgrading to paid tier
             # Uncomment these when moving to Azure Pro/Standard with Always On enabled

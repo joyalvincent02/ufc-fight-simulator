@@ -124,7 +124,7 @@ def build_dataset():
 
     df.dropna(inplace=True)
     df.to_csv("data/training_dataset.csv", index=False)
-    print("✅ Dataset written to data/training_dataset.csv")
+    print("Dataset written to data/training_dataset.csv")
 
 if __name__ == "__main__":
     build_dataset()

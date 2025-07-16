@@ -18,7 +18,7 @@ def update_all_fighters():
             save_fighter_to_db(data)
             time.sleep(0.5)  # be polite to the site
 
-    print("✅ Finished updating fighter profiles.")
+    print("Finished updating fighter profiles.")
 
 if __name__ == "__main__":
     update_all_fighters()

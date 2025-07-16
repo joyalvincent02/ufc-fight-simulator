@@ -31,7 +31,7 @@ def to_stats_obj(d):
 app = FastAPI()
 
 allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
-print("🔧 ALLOWED_ORIGINS =", allowed_origins)
+print("ALLOWED_ORIGINS =", allowed_origins)
 
 app.add_middleware(
     CORSMiddleware,
@@ -74,9 +74,9 @@ def get_fighter_image_url(name: str) -> str | None:
             return "https://ufc.com" + src if src.startswith("/") else src
 
     except Exception as e:
-        print(f"❌ Exception while scraping image: {e}")
+        print(f"Exception while scraping image: {e}")
 
-    print("⚠️ No image found.")
+    print("No image found.")
     return None
 
 
@@ -433,9 +433,9 @@ async def startup_event():
     """Start the UFC scheduler when the app starts"""
     try:
         start_scheduler()
-        print("🚀 UFC Scheduler started")
+        print("UFC Scheduler started")
     except Exception as e:
-        print(f"❌ Failed to start scheduler: {e}")
+        print(f"Failed to start scheduler: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -444,7 +444,7 @@ async def shutdown_event():
         stop_scheduler()
         print("🛑 UFC Scheduler stopped")
     except Exception as e:
-        print(f"❌ Error stopping scheduler: {e}")
+        print(f"Error stopping scheduler: {e}")
 
 # Scheduler management endpoints
 @app.get("/scheduler/status")
