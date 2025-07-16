@@ -3,9 +3,16 @@ from sqlalchemy import create_engine
 import os
 from datetime import datetime, date
 import re
-from src.azure_config import get_database_path, get_dataset_path
+from src.azure_config import get_dataset_path
 
-DATABASE_URL = get_database_path()
+# Use the same database connection as the main app
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL is None:
+    # Local development fallback
+    from src.azure_config import get_database_path
+    DATABASE_URL = get_database_path()
+
+print(f"ML Dataset - Using database: {DATABASE_URL[:50] if DATABASE_URL else 'None'}...")
 engine = create_engine(DATABASE_URL)
 
 def parse_height(s):

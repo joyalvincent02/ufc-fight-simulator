@@ -14,6 +14,8 @@ if DATABASE_URL is None:
     from src.azure_config import get_database_path
     DATABASE_URL = get_database_path()
 
+print(f"Main DB - Using database: {DATABASE_URL[:50] if DATABASE_URL else 'None'}...")
+
 engine = create_engine(
     DATABASE_URL,
     connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}

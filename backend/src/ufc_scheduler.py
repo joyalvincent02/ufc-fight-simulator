@@ -999,7 +999,8 @@ def get_scheduler():
     """Get the global scheduler instance"""
     global _scheduler_instance
     if _scheduler_instance is None:
-        database_url = os.getenv('DATABASE_URL', 'sqlite:///data/fighter_stats.db')
+        from src.azure_config import get_database_path
+        database_url = os.getenv('DATABASE_URL') or get_database_path()
         _scheduler_instance = UFCScheduler(database_url)
     return _scheduler_instance
 
