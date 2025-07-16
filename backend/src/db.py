@@ -7,7 +7,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/fighter_stats.db")
+# Use Azure-compatible database URL
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL is None:
+    # Local development fallback
+    from src.azure_config import get_database_path
+    DATABASE_URL = get_database_path()
 
 engine = create_engine(
     DATABASE_URL,

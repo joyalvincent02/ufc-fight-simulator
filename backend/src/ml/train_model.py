@@ -4,9 +4,19 @@ from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import cross_val_score
 import joblib
 import os
+from src.azure_config import get_dataset_path, get_model_path
 
-def train_model(dataset_path="data/training_dataset.csv", model_path="src/ml/fight_predictor.pkl"):
+def train_model(dataset_path=None, model_path=None):
     """Train the ML model and return metrics"""
+    # Use Azure-compatible paths
+    if dataset_path is None:
+        dataset_path = get_dataset_path()
+    if model_path is None:
+        model_path = get_model_path()
+    
+    print(f"Loading dataset from: {dataset_path}")
+    print(f"Will save model to: {model_path}")
+    
     df = pd.read_csv(dataset_path)
     X = df.drop(columns=["label"])
     y = df["label"]
@@ -33,7 +43,9 @@ def train_model(dataset_path="data/training_dataset.csv", model_path="src/ml/fig
         "features": len(X.columns),
         "train_accuracy": round(train_accuracy, 4),
         "cv_accuracy": round(cv_accuracy, 4),
-        "cv_std": round(cv_scores.std(), 4)
+        "cv_std": round(cv_scores.std(), 4),
+        "model_path": model_path,
+        "dataset_path": dataset_path
     }
     
     print(f"Model saved to {model_path}")

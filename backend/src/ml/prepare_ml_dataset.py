@@ -3,8 +3,9 @@ from sqlalchemy import create_engine
 import os
 from datetime import datetime, date
 import re
+from src.azure_config import get_database_path, get_dataset_path
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/fighter_stats.db")
+DATABASE_URL = get_database_path()
 engine = create_engine(DATABASE_URL)
 
 def parse_height(s):
@@ -123,8 +124,13 @@ def build_dataset():
     ], inplace=True)
 
     df.dropna(inplace=True)
-    df.to_csv("data/training_dataset.csv", index=False)
-    print("Dataset written to data/training_dataset.csv")
+    
+    # Use Azure-compatible path
+    dataset_path = get_dataset_path()
+    df.to_csv(dataset_path, index=False)
+    print(f"Dataset written to {dataset_path}")
+    print(f"Dataset shape: {df.shape}")
+    return dataset_path
 
 if __name__ == "__main__":
     build_dataset()

@@ -1,11 +1,30 @@
 import pandas as pd
 import numpy as np
 import joblib
+import os
+from src.azure_config import get_model_path
 
-model = joblib.load("src/ml/fight_predictor.pkl")
+def load_model():
+    """Load the ML model with Azure-compatible path"""
+    model_path = get_model_path()
+    try:
+        return joblib.load(model_path)
+    except FileNotFoundError:
+        # Fallback to local path for development
+        if os.path.exists("src/ml/fight_predictor.pkl"):
+            return joblib.load("src/ml/fight_predictor.pkl")
+        else:
+            raise FileNotFoundError(f"Model not found at {model_path} or src/ml/fight_predictor.pkl")
+
+# Load model on import
+model = load_model()
 
 def predict_fight_outcome(name_a, name_b):
     from src.db import SessionLocal, Fighter
+
+    # Reload model in case it was retrained
+    global model
+    model = load_model()
 
     db = SessionLocal()
     f1 = db.query(Fighter).filter(Fighter.name == name_a).first()
