@@ -84,6 +84,10 @@ def get_fighter_image_url(name: str) -> str | None:
 def read_root():
     return {"message": "Hello from FastAPI!"}
 
+@app.get("/health")
+def health_check():
+    return {"status": "healthy", "message": "UFC Fight Simulator API is running"}
+
 @app.get("/fighters")
 def list_fighters():
     db = SessionLocal()
