@@ -104,6 +104,25 @@ jobs:
           exit 1
         fi
 
+    - name: Cleanup Old Predictions
+      if: steps.context.outputs.action == 'check-results' || steps.context.outputs.action == 'all'
+      run: |
+        echo "Cleaning up old predictions..."
+        response=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.AZURE_APP_URL }}/scheduler/cleanup-old-predictions")
+        http_code=$(echo "$response" | tail -n1)
+        body=$(echo "$response" | head -n -1)
+        
+        echo "Response Code: $http_code"
+        echo "Response Body: $body"
+        
+        if [ "$http_code" -eq 200 ]; then
+          deleted=$(echo "$body" | grep -o '"deleted_predictions":[0-9]*' | cut -d':' -f2 || echo "0")
+          echo "Deleted predictions: $deleted"
+        else
+          echo "Failed to cleanup predictions (HTTP $http_code)"
+          exit 1
+        fi
+
     - name: Retrain ML Model
       if: steps.context.outputs.action == 'retrain-model' || steps.context.outputs.action == 'all'
       run: |

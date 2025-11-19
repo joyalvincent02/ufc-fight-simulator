@@ -566,6 +566,18 @@ class UFCScheduler:
             logger.error(f"Manual ML retraining failed: {e}")
             return {"error": str(e), "retrained": False}
 
+    def cleanup_old_predictions_manual(self):
+        """Manual trigger for cleaning up old predictions (called from API)"""
+        try:
+            logger.info("Manual trigger: Cleaning up old predictions...")
+            result = job_cleanup_old_predictions()
+            if not result:
+                return {"message": "Cleanup completed", "deleted_predictions": 0}
+            return result
+        except Exception as e:
+            logger.error(f"Manual cleanup failed: {e}")
+            return {"error": str(e)}
+
     # ...existing code...
     
 
@@ -921,6 +933,13 @@ def job_cleanup_old_predictions():
         timestamp = datetime.utcnow()
         scheduler.last_cleanup = timestamp
         scheduler._save_metadata('last_cleanup', timestamp.isoformat())
+        
+        return {
+            "message": "Cleanup completed",
+            "deleted_predictions": count,
+            "cutoff_date": cutoff_date.isoformat(),
+            "timestamp": timestamp.isoformat()
+        }
         
     except Exception as e:
         logger.error(f"Error during cleanup job: {e}")

@@ -478,6 +478,15 @@ def manual_event_check():
     except Exception as e:
         return {"error": str(e)}
 
+@app.post("/scheduler/cleanup-old-predictions")
+def manual_cleanup_old_predictions():
+    """Manually trigger cleanup of stale pending predictions"""
+    try:
+        scheduler = get_scheduler()
+        return scheduler.cleanup_old_predictions_manual()
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.post("/scheduler/pause")
 def pause_scheduler():
     """Pause the scheduler to stop automatic job execution"""
