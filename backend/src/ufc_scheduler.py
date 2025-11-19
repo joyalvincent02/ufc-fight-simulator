@@ -366,13 +366,13 @@ class UFCScheduler:
             return {"error": str(e)}
     
     def _cleanup_old_predictions(self):
-        """Clean up predictions older than 6 months but keep lifetime records"""
+        """Clean up predictions older than 120 days but keep lifetime records"""
         try:
             logger.info("Starting prediction cleanup...")
             self.last_cleanup = datetime.utcnow()
             
-            # Calculate cutoff date (6 months ago)
-            cutoff_date = datetime.utcnow() - timedelta(days=180)
+            # Calculate cutoff date (120 days ago)
+            cutoff_date = datetime.utcnow() - timedelta(days=120)
             
             db = SessionLocal()
             
@@ -909,8 +909,8 @@ def job_cleanup_old_predictions():
     try:
         logger.info("Starting prediction cleanup job...")
         
-        # Calculate cutoff date (6 months ago)
-        cutoff_date = datetime.utcnow() - timedelta(days=180)
+        # Calculate cutoff date (120 days ago)
+        cutoff_date = datetime.utcnow() - timedelta(days=120)
         
         db = SessionLocal()
         
