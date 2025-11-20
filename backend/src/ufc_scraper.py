@@ -102,6 +102,44 @@ def get_completed_event_links(days_back=7):
         logger.error(f"Error fetching completed events: {e}")
         return []
 
+def is_event_ongoing(event_url: str) -> bool:
+    """
+    Check if an event is ongoing or completed by looking for actual fight results
+    Returns True only if the event has clear "W" (Win) indicators in the first cell
+    This is the most reliable indicator that fights have completed
+    """
+    try:
+        response = requests.get(event_url, timeout=10)
+        soup = BeautifulSoup(response.text, "html.parser")
+        
+        fight_rows = soup.select("tbody.b-fight-details__table-body tr")
+        
+        if not fight_rows:
+            return False
+        
+        # Count how many fights have the "W" indicator in the first cell
+        # This is the most reliable sign that a fight has completed
+        fights_with_results = 0
+        
+        for row in fight_rows:
+            cells = row.select("td")
+            if len(cells) < 3:
+                continue
+            
+            # Check the first cell for a "W" (Win) indicator
+            # In UFCStats completed events, the first cell shows "W" for the winner
+            # This is the most reliable indicator and avoids false positives
+            first_cell = cells[0].get_text(strip=True).upper()
+            if first_cell == 'W' or first_cell == 'WIN':
+                fights_with_results += 1
+        
+        # Event is ongoing/completed if at least one fight has the "W" indicator
+        # This is a strict check that prevents false positives from upcoming events
+        return fights_with_results > 0
+    except Exception as e:
+        logger.warning(f"Error checking if event is ongoing: {e}")
+        return False
+
 def get_fight_card(event_url: str):
     response = requests.get(event_url, timeout=30)  # Only add timeout
     soup = BeautifulSoup(response.text, "html.parser")

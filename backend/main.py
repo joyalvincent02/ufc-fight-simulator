@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from src.fight_model import calculate_exchange_probabilities
 from src.simulate_fight import simulate_fight
-from src.ufc_scraper import get_upcoming_event_links, get_fight_card
+from src.ufc_scraper import get_upcoming_event_links, get_fight_card, is_event_ongoing
 from src.fighter_scraper import scrape_fighter_stats, save_fighter_to_db
 from src.db import SessionLocal, Fighter, ModelPrediction, FightResult
 from src.ensemble_predict import get_ensemble_prediction
@@ -123,7 +123,30 @@ def simulate_event(event_id: str):
 def list_upcoming_events():
     try:
         raw_events = get_upcoming_event_links()
-        return [{"id": e["url"].split("/")[-1], "name": e["title"], "url": e["url"]} for e in raw_events]
+        events_with_status = []
+        ongoing_events = []
+        upcoming_events = []
+        
+        for e in raw_events:
+            event_id = e["url"].split("/")[-1]
+            event_url = e["url"]
+            is_ongoing = is_event_ongoing(event_url)
+            
+            event_data = {
+                "id": event_id,
+                "name": e["title"],
+                "url": event_url,
+                "status": "ongoing" if is_ongoing else "upcoming"
+            }
+            
+            # Separate ongoing and upcoming events while preserving original order
+            if is_ongoing:
+                ongoing_events.append(event_data)
+            else:
+                upcoming_events.append(event_data)
+        
+        # Return ongoing events first, then upcoming events (both in original order)
+        return ongoing_events + upcoming_events
     except Exception as e:
         return {"error": str(e)}
 

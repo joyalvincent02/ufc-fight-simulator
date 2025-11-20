@@ -11,7 +11,7 @@ import {
 } from "@mui/icons-material";
 
 export default function HomePage() {
-  const [nextEvent, setNextEvent] = useState<null | { id: string; name: string }>(null);
+  const [nextEvent, setNextEvent] = useState<null | { id: string; name: string; status?: string }>(null);
   const [mainEvent, setMainEvent] = useState<null | {
     name: string;
     fighters: { name: string; image?: string }[];
@@ -182,7 +182,9 @@ export default function HomePage() {
               </div>
             ) : mainEvent ? (
               <>
-                <h2 className="text-2xl font-bold mb-4 text-red-500 dark:text-red-400">Next Event</h2>
+                <h2 className="text-2xl font-bold mb-4 text-red-500 dark:text-red-400">
+                  {nextEvent?.status === "ongoing" ? "Ongoing Event" : "Next Event"}
+                </h2>
                 <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">{mainEvent.name}</h2>
 
                 <div className="flex justify-center items-center gap-6 mb-4">
