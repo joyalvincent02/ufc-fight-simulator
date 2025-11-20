@@ -1,13 +1,23 @@
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
+import xgboost as xgb
 from sklearn.metrics import accuracy_score, classification_report
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_score, RandomizedSearchCV
+from sklearn.calibration import CalibratedClassifierCV
 import joblib
 import os
 from src.azure_config import get_dataset_path, get_model_path
+import numpy as np
 
-def train_model(dataset_path=None, model_path=None):
-    """Train the ML model and return metrics"""
+def train_model(dataset_path=None, model_path=None, use_hyperparameter_tuning=True, n_iter=30):
+    """
+    Train the ML model using XGBoost with hyperparameter tuning and probability calibration
+    
+    Args:
+        dataset_path: Path to training dataset
+        model_path: Path to save the trained model
+        use_hyperparameter_tuning: Whether to perform hyperparameter tuning (default: True)
+        n_iter: Number of iterations for RandomizedSearchCV (default: 30)
+    """
     # Use Azure-compatible paths
     if dataset_path is None:
         dataset_path = get_dataset_path()
@@ -21,22 +31,85 @@ def train_model(dataset_path=None, model_path=None):
     X = df.drop(columns=["label"])
     y = df["label"]
 
-    model = RandomForestClassifier(
-        n_estimators=200,
-        max_depth=10,
-        class_weight="balanced",
-        random_state=42
+    # Calculate scale_pos_weight for class imbalance (similar to class_weight="balanced")
+    # This is the ratio of negative to positive samples
+    pos_count = np.sum(y == 1)
+    neg_count = np.sum(y == 0)
+    scale_pos_weight = neg_count / pos_count if pos_count > 0 else 1.0
+
+    if use_hyperparameter_tuning and len(df) > 100:  # Only tune if we have enough data
+        print("Performing hyperparameter tuning...")
+        
+        # Define parameter grid for RandomizedSearchCV
+        param_distributions = {
+            'n_estimators': [100, 200, 300],
+            'max_depth': [6, 8, 10, 12],
+            'learning_rate': [0.05, 0.1, 0.15],
+            'subsample': [0.7, 0.8, 0.9],
+            'colsample_bytree': [0.7, 0.8, 0.9],
+            'min_child_weight': [1, 3, 5],
+            'gamma': [0, 0.1, 0.2]
+        }
+        
+        # Base model with fixed parameters
+        base_model = xgb.XGBClassifier(
+            scale_pos_weight=scale_pos_weight,
+            random_state=42,
+            eval_metric='logloss',
+            use_label_encoder=False
+        )
+        
+        # Randomized search with 5-fold CV
+        random_search = RandomizedSearchCV(
+            base_model,
+            param_distributions,
+            n_iter=n_iter,
+            cv=5,
+            scoring='accuracy',
+            n_jobs=-1,
+            random_state=42,
+            verbose=1
+        )
+        
+        random_search.fit(X, y)
+        best_model = random_search.best_estimator_
+        
+        print(f"Best parameters: {random_search.best_params_}")
+        print(f"Best CV score: {random_search.best_score_:.4f}")
+        
+    else:
+        print("Using default hyperparameters...")
+        best_model = xgb.XGBClassifier(
+            n_estimators=200,
+            max_depth=10,
+            learning_rate=0.1,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            min_child_weight=3,
+            scale_pos_weight=scale_pos_weight,
+            random_state=42,
+            eval_metric='logloss',
+            use_label_encoder=False
+        )
+        best_model.fit(X, y)
+
+    # Apply probability calibration
+    print("Calibrating probabilities...")
+    calibrated_model = CalibratedClassifierCV(
+        best_model,
+        method='isotonic',
+        cv=5
     )
-    model.fit(X, y)
+    calibrated_model.fit(X, y)
 
     # Calculate metrics
-    train_accuracy = accuracy_score(y, model.predict(X))
-    cv_scores = cross_val_score(model, X, y, cv=5)
+    train_accuracy = accuracy_score(y, calibrated_model.predict(X))
+    cv_scores = cross_val_score(calibrated_model, X, y, cv=5)
     cv_accuracy = cv_scores.mean()
     
-    # Save model
+    # Save calibrated model
     os.makedirs(os.path.dirname(model_path), exist_ok=True)
-    joblib.dump(model, model_path)
+    joblib.dump(calibrated_model, model_path)
     
     metrics = {
         "training_samples": len(df),
@@ -45,7 +118,9 @@ def train_model(dataset_path=None, model_path=None):
         "cv_accuracy": round(cv_accuracy, 4),
         "cv_std": round(cv_scores.std(), 4),
         "model_path": model_path,
-        "dataset_path": dataset_path
+        "dataset_path": dataset_path,
+        "hyperparameter_tuning": use_hyperparameter_tuning and len(df) > 100,
+        "calibrated": True
     }
     
     print(f"Model saved to {model_path}")

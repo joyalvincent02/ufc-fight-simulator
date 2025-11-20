@@ -115,6 +115,34 @@ def build_dataset():
     df["f2_striking_score"] = df["f2_slpm"] * df["f2_str_acc"] * df["f2_str_def"]
     df["f1_grappling_score"] = df["f1_td_avg"] * df["f1_td_acc"] * df["f1_td_def"]
     df["f2_grappling_score"] = df["f2_td_avg"] * df["f2_td_acc"] * df["f2_td_def"]
+    
+    # Feature interactions - differences and products
+    df["striking_score_diff"] = df["f1_striking_score"] - df["f2_striking_score"]
+    df["grappling_score_diff"] = df["f1_grappling_score"] - df["f2_grappling_score"]
+    
+    # Physical attribute interactions
+    df["reach_x_height"] = df["reach_diff"] * df["height_diff"]
+    df["weight_x_reach"] = df["weight_diff"] * df["reach_diff"]
+    df["age_x_reach"] = df["age_diff"] * df["reach_diff"]
+    
+    # Squared terms for key differences (captures non-linear relationships)
+    df["reach_diff_squared"] = df["reach_diff"] ** 2
+    df["age_diff_squared"] = df["age_diff"] ** 2
+    df["weight_diff_squared"] = df["weight_diff"] ** 2
+    
+    # Style matchup indicators (striker vs grappler)
+    # High striking score vs high grappling score
+    df["striker_vs_grappler"] = (
+        ((df["f1_striking_score"] > df["f1_grappling_score"] * 2) & 
+         (df["f2_grappling_score"] > df["f2_striking_score"] * 2)).astype(int) +
+        ((df["f2_striking_score"] > df["f2_grappling_score"] * 2) & 
+         (df["f1_grappling_score"] > df["f1_striking_score"] * 2)).astype(int)
+    )
+    
+    # Ratio of striking to grappling for each fighter
+    df["f1_strike_grapple_ratio"] = df["f1_striking_score"] / (df["f1_grappling_score"] + 0.1)
+    df["f2_strike_grapple_ratio"] = df["f2_striking_score"] / (df["f2_grappling_score"] + 0.1)
+    df["strike_grapple_ratio_diff"] = df["f1_strike_grapple_ratio"] - df["f2_strike_grapple_ratio"]
 
     # One-hot encode stance combinations
     df = pd.get_dummies(df, columns=["f1_stance", "f2_stance"], dummy_na=True)

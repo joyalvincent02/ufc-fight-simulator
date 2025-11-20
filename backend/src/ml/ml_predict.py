@@ -126,21 +126,75 @@ def predict_fight_outcome(name_a, name_b):
         "f1_grappling_score": safe(f1.td_avg) * safe(f1.td_acc) * safe(f1.td_def),
         "f2_grappling_score": safe(f2.td_avg) * safe(f2.td_acc) * safe(f2.td_def)
     }
+    
+    # Feature interactions - differences and products
+    features["striking_score_diff"] = features["f1_striking_score"] - features["f2_striking_score"]
+    features["grappling_score_diff"] = features["f1_grappling_score"] - features["f2_grappling_score"]
+    
+    # Physical attribute interactions
+    features["reach_x_height"] = reach_diff * height_diff
+    features["weight_x_reach"] = weight_diff * reach_diff
+    features["age_x_reach"] = age_diff * reach_diff
+    
+    # Squared terms for key differences
+    features["reach_diff_squared"] = reach_diff ** 2
+    features["age_diff_squared"] = age_diff ** 2
+    features["weight_diff_squared"] = weight_diff ** 2
+    
+    # Style matchup indicators
+    f1_striking = features["f1_striking_score"]
+    f1_grappling = features["f1_grappling_score"]
+    f2_striking = features["f2_striking_score"]
+    f2_grappling = features["f2_grappling_score"]
+    
+    features["striker_vs_grappler"] = (
+        (1 if (f1_striking > f1_grappling * 2 and f2_grappling > f2_striking * 2) else 0) +
+        (1 if (f2_striking > f2_grappling * 2 and f1_grappling > f1_striking * 2) else 0)
+    )
+    
+    # Ratio of striking to grappling
+    features["f1_strike_grapple_ratio"] = f1_striking / max(f1_grappling, 0.1)
+    features["f2_strike_grapple_ratio"] = f2_striking / max(f2_grappling, 0.1)
+    features["strike_grapple_ratio_diff"] = features["f1_strike_grapple_ratio"] - features["f2_strike_grapple_ratio"]
 
     # Add one-hot encoded stance features
-    model_features = model.feature_names_in_
+    # Handle both regular models and calibrated models
+    # CalibratedClassifierCV wraps the base estimator, so we need to access it
+    if hasattr(model, 'base_estimator'):
+        # CalibratedClassifierCV - get feature names from base estimator
+        base_model = model.base_estimator
+        if hasattr(base_model, 'feature_names_in_'):
+            model_features = base_model.feature_names_in_
+        elif hasattr(model, 'feature_names_in_'):
+            model_features = model.feature_names_in_
+        else:
+            # Fallback: use current features (for backward compatibility)
+            model_features = list(features.keys())
+    elif hasattr(model, 'feature_names_in_'):
+        # Regular XGBoost model
+        model_features = model.feature_names_in_
+    else:
+        # Fallback: use current features (for backward compatibility)
+        model_features = list(features.keys())
+    
     stance_keys = [col for col in model_features if "stance" in col]
     for key in stance_keys:
-        features[key] = 0
+        if key not in features:
+            features[key] = 0
 
     if f1.stance:
         key = f"f1_stance_{f1.stance}"
-        if key in features:
+        if key in model_features:
             features[key] = 1
     if f2.stance:
         key = f"f2_stance_{f2.stance}"
-        if key in features:
+        if key in model_features:
             features[key] = 1
+
+    # Ensure all model features are present (fill missing with 0)
+    for feature_name in model_features:
+        if feature_name not in features:
+            features[feature_name] = 0.0
 
     # Build input for model
     input_df = pd.DataFrame([features], columns=model_features)
