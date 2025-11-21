@@ -3,7 +3,12 @@
 import requests
 from bs4 import BeautifulSoup
 from sqlalchemy.orm import Session
-from src.db import SessionLocal, Fighter, ModelPrediction, FightResult
+from src.db import (
+    SessionLocal,
+    Fighter,
+    ModelPrediction,
+    upsert_fight_result,
+)
 from sqlalchemy import text
 import time
 import re
@@ -75,29 +80,61 @@ def save_outcomes(db: Session, outcomes):
     
     # Save to fight_results table (using existing schema)
     for fight in outcomes:
-        # Create FightResult (this will be handled by the existing scraping logic)
-        # We don't need to create new FightResult objects since the existing
-        # scraping logic already handles this table
-        
-        # Determine the actual winner for predictions
-        if fight["result"] == "win":
-            actual_winner = fighter_name
-        elif fight["result"] == "loss": 
-            actual_winner = fight["opponent_name"]
-        else:
-            actual_winner = "Draw"
-        
-        # Update any matching predictions
-        predictions = db.query(ModelPrediction).filter(
-            ((ModelPrediction.fighter_a == fighter_name) & (ModelPrediction.fighter_b == fight["opponent_name"])) |
-            ((ModelPrediction.fighter_a == fight["opponent_name"]) & (ModelPrediction.fighter_b == fighter_name))
-        ).all()
-        
-        for pred in predictions:
-            pred.actual_winner = actual_winner
-            pred.correct = (pred.predicted_winner == actual_winner)
-    
-    db.commit()
+        try:
+            upsert_fight_result(
+                db,
+                fighter_name=fight["fighter_name"],
+                opponent_name=fight["opponent_name"],
+                result=fight["result"],
+                event=fight["event"],
+                event_date=fight["event_date"],
+                method=fight["method"],
+                round=fight["round"],
+                time=fight["time"],
+            )
+
+            inverse_result = None
+            if fight["result"] == "win":
+                inverse_result = "loss"
+            elif fight["result"] == "loss":
+                inverse_result = "win"
+            else:
+                inverse_result = fight["result"]
+
+            upsert_fight_result(
+                db,
+                fighter_name=fight["opponent_name"],
+                opponent_name=fight["fighter_name"],
+                result=inverse_result,
+                event=fight["event"],
+                event_date=fight["event_date"],
+                method=fight["method"],
+                round=fight["round"],
+                time=fight["time"],
+            )
+            
+            # Determine the actual winner for predictions
+            if fight["result"] == "win":
+                actual_winner = fighter_name
+            elif fight["result"] == "loss": 
+                actual_winner = fight["opponent_name"]
+            else:
+                actual_winner = "Draw"
+            
+            # Update any matching predictions
+            predictions = db.query(ModelPrediction).filter(
+                ((ModelPrediction.fighter_a == fighter_name) & (ModelPrediction.fighter_b == fight["opponent_name"])) |
+                ((ModelPrediction.fighter_a == fight["opponent_name"]) & (ModelPrediction.fighter_b == fighter_name))
+            ).all()
+            
+            for pred in predictions:
+                pred.actual_winner = actual_winner
+                pred.correct = (pred.predicted_winner == actual_winner)
+
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            print(f"Failed to save fight result for {fight['fighter_name']} vs {fight['opponent_name']}: {e}")
 
 # Main loop to scrape all fighters
 def scrape_all_fighters():

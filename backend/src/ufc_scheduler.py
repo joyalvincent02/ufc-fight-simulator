@@ -12,7 +12,13 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR, EVENT_JOB_MISSED
-from src.db import SessionLocal, ModelPrediction, Fighter, SchedulerMetadata
+from src.db import (
+    SessionLocal,
+    ModelPrediction,
+    Fighter,
+    SchedulerMetadata,
+    upsert_fight_result,
+)
 from src.ufc_scraper import get_upcoming_event_links, get_fight_card
 from src.ensemble_predict import get_ensemble_prediction
 from src.fighter_scraper import scrape_fighter_stats, save_fighter_to_db
@@ -813,6 +819,9 @@ def job_check_completed_events():
                             fighter_a_norm = normalize_fighter_name(result['fighter_a'])
                             fighter_b_norm = normalize_fighter_name(result['fighter_b'])
                             winner_norm = normalize_fighter_name(result['winner'])
+                            fighter_a_raw = result['fighter_a']
+                            fighter_b_raw = result['fighter_b']
+                            winner_raw = result['winner']
                             
                             # Find matching predictions in database
                             predictions = db.query(ModelPrediction).filter(
@@ -846,6 +855,33 @@ def job_check_completed_events():
                                     event_matches += 1
                                     fight_matched = True
                             
+                            # Persist fight results even if we didn't have a prediction match
+                            loser_raw = None
+                            if winner_norm == fighter_a_norm:
+                                loser_raw = fighter_b_raw
+                            elif winner_norm == fighter_b_norm:
+                                loser_raw = fighter_a_raw
+
+                            if loser_raw:
+                                upsert_fight_result(
+                                    db,
+                                    fighter_name=winner_raw,
+                                    opponent_name=loser_raw,
+                                    result="win",
+                                    event=event['title'],
+                                    event_date=event.get('date') or event.get('date_text'),
+                                )
+                                upsert_fight_result(
+                                    db,
+                                    fighter_name=loser_raw,
+                                    opponent_name=winner_raw,
+                                    result="loss",
+                                    event=event['title'],
+                                    event_date=event.get('date') or event.get('date_text'),
+                                )
+                            else:
+                                logger.warning(f"Could not determine loser for fight result: {result}")
+
                             # Track unmatched fights for debugging
                             if not fight_matched:
                                 detailed_results.append({

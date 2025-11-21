@@ -1,7 +1,7 @@
-from sqlalchemy import create_engine, Column, String, Float, DateTime, Integer, Date, Boolean
+from sqlalchemy import create_engine, Column, String, Float, DateTime, Integer, Date, Boolean, func
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from datetime import datetime
+from sqlalchemy.orm import sessionmaker, Session
+from datetime import datetime, date
 import os
 from dotenv import load_dotenv
 
@@ -75,7 +75,7 @@ class FightResult(Base):
     opponent_name = Column(String, nullable=False)  # Opponent
     result = Column(String, nullable=False)  # "win", "loss", "draw"
     method = Column(String, nullable=True)
-    round = Column(String, nullable=True)
+    round = Column(Integer, nullable=True)
     time = Column(String, nullable=True)
     event = Column(String, nullable=True)
     event_date = Column(String, nullable=True)  # Keep as string to match existing
@@ -162,3 +162,67 @@ def log_prediction(
         return None
     finally:
         db.close()
+
+
+def upsert_fight_result(
+    db: Session,
+    *,
+    fighter_name: str,
+    opponent_name: str,
+    result: str,
+    event: str | None = None,
+    event_date: str | datetime | date | None = None,
+    method: str | None = None,
+    round: str | None = None,
+    time: str | None = None,
+) -> FightResult:
+    """Replace any existing fight result for the given matchup/event with the new data."""
+
+    def serialize_event_date(value):
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value.strftime("%Y-%m-%d")
+        if isinstance(value, date):
+            return value.strftime("%Y-%m-%d")
+        return str(value)
+
+    def normalize_round(value):
+        if value is None:
+            return None
+        try:
+            return int(str(value).strip() or 0)
+        except (ValueError, TypeError):
+            return None
+
+    normalized_result = result.lower() if result else None
+    normalized_event_date = serialize_event_date(event_date)
+    normalized_round = normalize_round(round)
+
+    delete_query = db.query(FightResult).filter(
+        FightResult.fighter_name == fighter_name,
+        FightResult.opponent_name == opponent_name,
+    )
+    if event is None:
+        delete_query = delete_query.filter(FightResult.event.is_(None))
+    else:
+        delete_query = delete_query.filter(FightResult.event == event)
+    if normalized_result:
+        delete_query = delete_query.filter(FightResult.result == normalized_result)
+    delete_query.delete(synchronize_session=False)
+    db.flush()
+
+    next_id = (db.query(func.max(FightResult.id)).scalar() or 0) + 1
+    fight = FightResult(
+        id=next_id,
+        fighter_name=fighter_name,
+        opponent_name=opponent_name,
+        result=normalized_result or "win",
+        method=method,
+        round=normalized_round,
+        time=time,
+        event=event,
+        event_date=normalized_event_date,
+    )
+    db.add(fight)
+    return fight
