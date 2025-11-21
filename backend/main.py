@@ -11,7 +11,8 @@ from src.ensemble_predict import get_ensemble_prediction
 from src.ufc_scheduler import start_scheduler, stop_scheduler, get_scheduler
 from types import SimpleNamespace
 from bs4 import BeautifulSoup
-from sqlalchemy import func
+from sqlalchemy import func, or_, and_
+from datetime import datetime
 import requests
 import re
 import json
@@ -43,6 +44,54 @@ app.add_middleware(
 
 def name_to_slug(name: str) -> str:
     return name.lower().replace(" ", "-")
+
+def _format_event_date(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d")
+
+    if isinstance(value, str):
+        normalized = value.replace("Sept.", "Sep.").replace("Sept", "Sep")
+        for fmt in ("%b. %d, %Y", "%b %d, %Y", "%B %d, %Y", "%m/%d/%Y"):
+            try:
+                dt = datetime.strptime(normalized, fmt)
+                return dt.strftime("%Y-%m-%d")
+            except ValueError:
+                continue
+        return value
+
+    try:
+        return datetime.fromisoformat(str(value)).strftime("%Y-%m-%d")
+    except Exception:
+        return str(value)
+
+def _get_prediction_event_info(db, fighter_a: str, fighter_b: str):
+    result = (
+        db.query(FightResult.event, FightResult.event_date)
+        .filter(
+            or_(
+                and_(
+                    FightResult.fighter_name == fighter_a,
+                    FightResult.opponent_name == fighter_b,
+                ),
+                and_(
+                    FightResult.fighter_name == fighter_b,
+                    FightResult.opponent_name == fighter_a,
+                ),
+            )
+        )
+        .order_by(FightResult.id.desc())
+        .first()
+    )
+
+    if result:
+        return {
+            "event": result.event,
+            "event_date": _format_event_date(result.event_date),
+        }
+
+    return {"event": None, "event_date": None}
 
 def get_fighter_image_url(name: str) -> str | None:
     slug = name_to_slug(name)
@@ -121,34 +170,73 @@ def simulate_event(event_id: str):
 
 @app.get("/events")
 def list_upcoming_events():
+    db = SessionLocal()
     try:
         raw_events = get_upcoming_event_links()
-        events_with_status = []
         ongoing_events = []
         upcoming_events = []
-        
+
         for e in raw_events:
             event_id = e["url"].split("/")[-1]
             event_url = e["url"]
             is_ongoing = is_event_ongoing(event_url)
-            
+
+            event_date = (
+                db.query(FightResult.event_date)
+                .filter(
+                    FightResult.event == e["title"],
+                    FightResult.event_date.isnot(None),
+                )
+                .order_by(FightResult.id.desc())
+                .first()
+            )
+
+            fallback_date = None
+            if not event_date and e.get("date"):
+                fallback_date = e["date"].strftime("%Y-%m-%d")
+            elif not event_date and e.get("date_text"):
+                fallback_date = _format_event_date(e["date_text"])
+
+            event_date_value = event_date[0] if event_date else None
+
+            iso_date = None
+            display_date = None
+
+            if event_date_value:
+                iso_date = _format_event_date(event_date_value)
+                display_date = event_date_value
+            elif fallback_date:
+                iso_date = fallback_date
+                display_date = e.get("date_text") or fallback_date
+            else:
+                display_date = e.get("date_text")
+
+            if isinstance(display_date, datetime):
+                display_date_str = display_date.strftime("%b %d, %Y")
+            elif display_date is not None:
+                display_date_str = str(display_date)
+            else:
+                display_date_str = None
+
             event_data = {
                 "id": event_id,
                 "name": e["title"],
                 "url": event_url,
-                "status": "ongoing" if is_ongoing else "upcoming"
+                "status": "ongoing" if is_ongoing else "upcoming",
+                "event_date": iso_date,
+                "event_date_display": display_date_str,
             }
-            
-            # Separate ongoing and upcoming events while preserving original order
+
             if is_ongoing:
                 ongoing_events.append(event_data)
             else:
                 upcoming_events.append(event_data)
-        
-        # Return ongoing events first, then upcoming events (both in original order)
+
         return ongoing_events + upcoming_events
     except Exception as e:
         return {"error": str(e)}
+    finally:
+        db.close()
 
 @app.get("/simulate-event/{event_id}")
 def simulate_full_event(event_id: str, model: str = Query("ensemble", enum=["sim", "ml", "ensemble"])):
@@ -389,6 +477,7 @@ def get_detailed_performance():
         
         detailed_results = []
         for pred in predictions:
+            event_info = _get_prediction_event_info(db, pred.fighter_a, pred.fighter_b)
             detailed_results.append({
                 "id": pred.id,
                 "fighter_a": pred.fighter_a,
@@ -401,7 +490,9 @@ def get_detailed_performance():
                 "fighter_b_prob": pred.fighter_b_prob,
                 "penalty_score": pred.penalty_score,
                 "timestamp": pred.timestamp.isoformat() if pred.timestamp else None,
-                "has_result": pred.actual_winner is not None
+                "has_result": pred.actual_winner is not None,
+                "event": event_info["event"],
+                "event_date": event_info["event_date"],
             })
         
         return {

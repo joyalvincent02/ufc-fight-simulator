@@ -11,6 +11,9 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 type Event = {
   id: string;
   name: string;
+  status?: "ongoing" | "upcoming";
+  event_date?: string | null;
+  event_date_display?: string | null;
 };
 
 export default function EventsPage() {
@@ -81,14 +84,30 @@ export default function EventsPage() {
               key={event.id}
               className="bg-white/90 dark:bg-white/5 border border-gray-200 dark:border-white/10 backdrop-blur-md p-4 sm:p-6 rounded-xl flex items-center justify-between shadow hover:shadow-lg transition group"
             >
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
                 <SportsMmaIcon 
                   sx={{ fontSize: 24 }} 
                   className="text-red-500 flex-shrink-0" 
                 />
-                <span className="text-base sm:text-lg font-medium text-gray-900 dark:text-white">
-                  {event.name}
-                </span>
+                <div>
+                  <span className="text-base sm:text-lg font-medium text-gray-900 dark:text-white block">
+                    {event.name}
+                  </span>
+                  {(event.event_date_display || event.event_date) && (
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      {event.event_date_display ??
+                        new Date(
+                          event.event_date!.includes("T")
+                            ? event.event_date!
+                            : `${event.event_date}T12:00:00Z`
+                        ).toLocaleDateString(undefined, {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                    </span>
+                  )}
+                </div>
               </div>
               <Link
                 to={`/simulate/${event.id}`}

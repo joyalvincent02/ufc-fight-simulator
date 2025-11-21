@@ -7,6 +7,17 @@ logger = logging.getLogger(__name__)
 
 BASE_URL = "http://ufcstats.com"
 
+def _parse_event_date(date_text: str | None):
+    if not date_text:
+        return None
+    normalized = date_text.replace("Sept.", "Sep.").replace("Sept", "Sep")
+    for fmt in ["%B %d, %Y", "%b %d, %Y", "%b. %d, %Y", "%m/%d/%Y"]:
+        try:
+            return datetime.strptime(normalized, fmt)
+        except ValueError:
+            continue
+    return None
+
 def get_upcoming_event_links():
     url = f"{BASE_URL}/statistics/events/upcoming"
     response = requests.get(url, timeout=30)  # Only add timeout
@@ -16,12 +27,17 @@ def get_upcoming_event_links():
 
     for row in soup.select("tr.b-statistics__table-row"):
         a_tag = row.find("a")
+        date_cell = row.find("span", class_="b-statistics__date")
         if a_tag and "href" in a_tag.attrs:
             event_url = a_tag["href"]
             event_title = a_tag.get_text(strip=True)
+            date_text = date_cell.get_text(strip=True) if date_cell else None
+            parsed_date = _parse_event_date(date_text)
             event_links.append({
                 "url": event_url,
-                "title": event_title
+                "title": event_title,
+                "date": parsed_date,
+                "date_text": date_text or "Unknown"
             })
 
     return event_links

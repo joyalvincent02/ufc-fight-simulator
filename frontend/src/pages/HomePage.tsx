@@ -10,8 +10,16 @@ import {
   SportsMma 
 } from "@mui/icons-material";
 
+type NextEvent = {
+  id: string;
+  name: string;
+  status?: string;
+  event_date?: string | null;
+  event_date_display?: string | null;
+};
+
 export default function HomePage() {
-  const [nextEvent, setNextEvent] = useState<null | { id: string; name: string; status?: string }>(null);
+  const [nextEvent, setNextEvent] = useState<null | NextEvent>(null);
   const [mainEvent, setMainEvent] = useState<null | {
     name: string;
     fighters: { name: string; image?: string }[];
@@ -25,6 +33,22 @@ export default function HomePage() {
     accuracy: 0
   });
   const [loadingPerformance, setLoadingPerformance] = useState(true);
+
+  const formatEventDate = (event: NextEvent | null) => {
+    if (!event) return null;
+    if (event.event_date_display) return event.event_date_display;
+    if (event.event_date) {
+      const iso = event.event_date.includes("T")
+        ? event.event_date
+        : `${event.event_date}T12:00:00Z`;
+      return new Date(iso).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    }
+    return null;
+  };
 
   useEffect(() => {
     // Load event data
@@ -85,6 +109,8 @@ export default function HomePage() {
       setLoadingPerformance(false);
     });
   }, []);
+
+  const nextEventDateDisplay = formatEventDate(nextEvent);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-white relative overflow-hidden font-sans">
@@ -185,7 +211,12 @@ export default function HomePage() {
                 <h2 className="text-2xl font-bold mb-4 text-red-500 dark:text-red-400">
                   {nextEvent?.status === "ongoing" ? "Ongoing Event" : "Next Event"}
                 </h2>
-                <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">{mainEvent.name}</h2>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">{mainEvent.name}</h2>
+                {nextEventDateDisplay && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    {nextEventDateDisplay}
+                  </p>
+                )}
 
                 <div className="flex justify-center items-center gap-6 mb-4">
                   {mainEvent.fighters.length >= 2 && (
