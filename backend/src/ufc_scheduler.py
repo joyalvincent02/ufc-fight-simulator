@@ -549,6 +549,15 @@ class UFCScheduler:
             self.last_ml_retrain = timestamp
             self._save_metadata('last_ml_retrain', timestamp.isoformat())
             
+            # Step 4: Regenerate pending predictions for future events
+            db = SessionLocal()
+            try:
+                _regenerate_future_predictions(db)
+            except Exception as e:
+                logger.error(f"Error regenerating future predictions: {e}")
+            finally:
+                db.close()
+            
             return {
                 "message": f"ML model retrained with {new_results_count} new results",
                 "retrained": True,
@@ -981,6 +990,103 @@ def job_cleanup_old_predictions():
         logger.error(f"Error during cleanup job: {e}")
         logger.error(traceback.format_exc())
 
+def _regenerate_future_predictions(db):
+    """Regenerate pending predictions for future events after model retraining"""
+    try:
+        logger.info("Regenerating pending predictions for future events...")
+        
+        def parse_event_date(value):
+            if not value:
+                return None
+            if isinstance(value, datetime):
+                return value.date()
+            if isinstance(value, str):
+                normalized = value.replace("Sept.", "Sep.").replace("Sept", "Sep")
+                for fmt in ("%Y-%m-%d", "%b %d, %Y", "%b. %d, %Y", "%B %d, %Y"):
+                    try:
+                        return datetime.strptime(normalized, fmt).date()
+                    except ValueError:
+                        continue
+            return None
+        
+        today = datetime.utcnow().date()
+        pending_predictions = db.query(ModelPrediction).filter(
+            ModelPrediction.actual_winner.is_(None)
+        ).all()
+        
+        regenerated_count = 0
+        skipped_count = 0
+        
+        for prediction in pending_predictions:
+            # Check if this prediction is for a future event
+            fight_result = db.query(FightResult).filter(
+                or_(
+                    and_(
+                        FightResult.fighter_name == prediction.fighter_a,
+                        FightResult.opponent_name == prediction.fighter_b
+                    ),
+                    and_(
+                        FightResult.fighter_name == prediction.fighter_b,
+                        FightResult.opponent_name == prediction.fighter_a
+                    )
+                )
+            ).order_by(FightResult.id.desc()).first()
+            
+            # If no fight_result, assume it's a future event (no results yet)
+            # If fight_result exists, check if event_date is in the future
+            is_future_event = True
+            if fight_result and fight_result.event_date:
+                event_date = parse_event_date(fight_result.event_date)
+                if event_date:
+                    is_future_event = event_date > today
+            
+            if not is_future_event:
+                skipped_count += 1
+                continue
+            
+            # Regenerate prediction with new model
+            try:
+                result = get_ensemble_prediction(
+                    prediction.fighter_a,
+                    prediction.fighter_b,
+                    model_type=prediction.model,
+                    log_to_db=False  # We'll update manually
+                )
+                
+                # Update existing prediction with new values
+                prediction.predicted_winner = prediction.fighter_a if result["fighter_a_win_prob"] > 50 else prediction.fighter_b
+                prediction.fighter_a_prob = result["fighter_a_win_prob"]
+                prediction.fighter_b_prob = result["fighter_b_win_prob"]
+                prediction.draw_prob = 100.0 - result["fighter_a_win_prob"] - result["fighter_b_win_prob"]
+                prediction.timestamp = datetime.utcnow()  # Update timestamp to reflect regeneration
+                
+                # Update penalty score and diffs if available
+                if "penalty_score" in result and result["penalty_score"] is not None:
+                    prediction.penalty_score = float(result["penalty_score"])
+                if "diffs" in result:
+                    diffs = result["diffs"]
+                    if "weight_diff" in diffs:
+                        prediction.weight_diff = int(diffs["weight_diff"]) if diffs["weight_diff"] is not None else None
+                    if "height_diff" in diffs:
+                        prediction.height_diff = int(diffs["height_diff"]) if diffs["height_diff"] is not None else None
+                    if "reach_diff" in diffs:
+                        prediction.reach_diff = int(diffs["reach_diff"]) if diffs["reach_diff"] is not None else None
+                    if "age_diff" in diffs:
+                        prediction.age_diff = int(diffs["age_diff"]) if diffs["age_diff"] is not None else None
+                
+                regenerated_count += 1
+                
+            except Exception as e:
+                logger.warning(f"Failed to regenerate prediction for {prediction.fighter_a} vs {prediction.fighter_b} ({prediction.model}): {e}")
+                continue
+        
+        db.commit()
+        logger.info(f"Regenerated {regenerated_count} pending predictions for future events (skipped {skipped_count} past events)")
+        
+    except Exception as e:
+        logger.error(f"Error regenerating future predictions: {e}")
+        logger.error(traceback.format_exc())
+
 def job_retrain_ml_model():
     """Job function for retraining the ML model"""
     try:
@@ -1042,9 +1148,21 @@ def job_retrain_ml_model():
         
         logger.info(f"ML model retraining completed with {new_results_count} new results")
         
+        # Step 4: Regenerate pending predictions for future events
+        db = SessionLocal()
+        try:
+            _regenerate_future_predictions(db)
+        except Exception as e:
+            logger.error(f"Error regenerating future predictions: {e}")
+        finally:
+            db.close()
+        
     except Exception as e:
         logger.error(f"Error in ML model retraining job: {e}")
         logger.error(traceback.format_exc())
+    finally:
+        if 'db' in locals():
+            db.close()
 
 
 # Global scheduler instance

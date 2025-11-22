@@ -10,7 +10,8 @@ BASE_URL = "http://ufcstats.com"
 def _parse_event_date(date_text: str | None):
     if not date_text:
         return None
-    normalized = date_text.replace("Sept.", "Sep.").replace("Sept", "Sep")
+    # Normalize "Sept." to "Sep." but don't replace "Sept" in "September"
+    normalized = date_text.replace("Sept.", "Sep.").replace("Sept ", "Sep ")
     for fmt in ["%B %d, %Y", "%b %d, %Y", "%b. %d, %Y", "%m/%d/%Y"]:
         try:
             return datetime.strptime(normalized, fmt)
@@ -77,30 +78,26 @@ def get_completed_event_links(days_back=7):
                 event_url = a_tag["href"]
                 event_title = a_tag.get_text(strip=True)
                 
-                # Try to parse the date
+                # Try to parse the date using the same function as upcoming events
                 event_date = None
                 if date_cell:
                     date_text = date_cell.get_text(strip=True)
-                    try:
-                        # Handle various date formats
-                        for date_format in ["%B %d, %Y", "%b %d, %Y", "%m/%d/%Y"]:
-                            try:
-                                event_date = datetime.strptime(date_text, date_format)
-                                break
-                            except ValueError:
-                                continue
-                    except Exception as e:
-                        logger.warning(f"Could not parse date '{date_text}': {e}")
+                    event_date = _parse_event_date(date_text)
+                    if not event_date:
+                        logger.warning(f"Could not parse date '{date_text}' for event '{event_title}'")
                 
                 # If we couldn't parse the date or it's within our timeframe, include it
-                if not event_date or event_date >= cutoff_date:
+                # Compare dates (not datetime) to avoid timezone issues
+                event_date_only = event_date.date() if event_date else None
+                cutoff_date_only = cutoff_date.date()
+                if not event_date_only or event_date_only >= cutoff_date_only:
                     event_links.append({
                         "url": event_url,
                         "title": event_title,
                         "date": event_date,
                         "date_text": date_cell.get_text(strip=True) if date_cell else "Unknown"
                     })
-                    logger.debug(f"Added event: {event_title} ({event_date or 'Unknown date'})")
+                    logger.info(f"Added completed event: {event_title} ({event_date.strftime('%Y-%m-%d') if event_date else 'Unknown date'})")
                 else:
                     # Events are typically in chronological order, but we'll continue
                     # checking a few more in case some are out of order
@@ -155,6 +152,59 @@ def is_event_ongoing(event_url: str) -> bool:
     except Exception as e:
         logger.warning(f"Error checking if event is ongoing: {e}")
         return False
+
+def check_event_completion_status(event_url: str) -> tuple[bool, bool, int]:
+    """
+    Check event completion status by analyzing fight results
+    Returns: (has_any_results, all_fights_complete, total_fights)
+    - has_any_results: True if at least one fight has results
+    - all_fights_complete: True if all fights have results
+    - total_fights: Total number of fights on the card
+    """
+    try:
+        response = requests.get(event_url, timeout=10)
+        soup = BeautifulSoup(response.text, "html.parser")
+        
+        fight_rows = soup.select("tbody.b-fight-details__table-body tr")
+        
+        if not fight_rows:
+            return (False, False, 0)
+        
+        total_fights = 0
+        fights_with_results = 0
+        
+        for row in fight_rows:
+            cells = row.select("td")
+            if len(cells) < 3:
+                continue
+            
+            # Check if this row represents a valid fight (has fighter links)
+            fighter_links = row.select("a.b-link")
+            if len(fighter_links) < 2:
+                # Skip rows that don't have two fighter links (might be header or separator)
+                continue
+            
+            # Count this as a valid fight row
+            total_fights += 1
+            
+            # Check the first cell for a "W" (Win) indicator
+            first_cell = cells[0].get_text(strip=True).upper()
+            if first_cell == 'W' or first_cell == 'WIN':
+                fights_with_results += 1
+            # Also check for result indicators in the row text (KO, Decision, Submission, etc.)
+            elif total_fights > 0:  # Only check if we've already counted this as a fight
+                row_text = row.get_text().upper()
+                result_indicators = ['DECISION', 'UD', 'MD', 'SD', 'KO', 'TKO', 'SUBMISSION', 'SUB', 'DQ', 'NC', 'NO CONTEST']
+                if any(indicator in row_text for indicator in result_indicators):
+                    fights_with_results += 1
+        
+        has_any_results = fights_with_results > 0
+        all_fights_complete = total_fights > 0 and fights_with_results == total_fights
+        
+        return (has_any_results, all_fights_complete, total_fights)
+    except Exception as e:
+        logger.warning(f"Error checking event completion status: {e}")
+        return (False, False, 0)
 
 def get_fight_card(event_url: str):
     response = requests.get(event_url, timeout=30)  # Only add timeout

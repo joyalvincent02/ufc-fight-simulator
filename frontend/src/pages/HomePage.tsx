@@ -54,10 +54,11 @@ export default function HomePage() {
     // Load event data
     getEvents().then((events) => {
       if (events.length === 0) return;
-      const first = events[0];
-      setNextEvent(first);
+      // Prioritize ongoing events, otherwise use the first event
+      const selectedEvent = events.find(e => e.status === "ongoing") || events[0];
+      setNextEvent(selectedEvent);
 
-      simulateEvent(first.id)
+      simulateEvent(selectedEvent.id)
         .then((data) => {
           if (data.fights && data.fights.length > 0) {
             setMainEvent({

@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from src.fight_model import calculate_exchange_probabilities
 from src.simulate_fight import simulate_fight
-from src.ufc_scraper import get_upcoming_event_links, get_fight_card, is_event_ongoing
+from src.ufc_scraper import get_upcoming_event_links, get_completed_event_links, get_fight_card, is_event_ongoing, check_event_completion_status
 from src.fighter_scraper import scrape_fighter_stats, save_fighter_to_db
 from src.db import SessionLocal, Fighter, ModelPrediction, FightResult
 from src.ensemble_predict import get_ensemble_prediction
@@ -12,7 +12,7 @@ from src.ufc_scheduler import start_scheduler, stop_scheduler, get_scheduler
 from types import SimpleNamespace
 from bs4 import BeautifulSoup
 from sqlalchemy import func, or_, and_
-from datetime import datetime
+from datetime import datetime, date, timedelta
 import requests
 import re
 import json
@@ -52,7 +52,8 @@ def _format_event_date(value):
         return value.strftime("%Y-%m-%d")
 
     if isinstance(value, str):
-        normalized = value.replace("Sept.", "Sep.").replace("Sept", "Sep")
+        # Normalize "Sept." to "Sep." but don't replace "Sept" in "September"
+        normalized = value.replace("Sept.", "Sep.").replace("Sept ", "Sep ")
         for fmt in ("%b. %d, %Y", "%b %d, %Y", "%B %d, %Y", "%m/%d/%Y"):
             try:
                 dt = datetime.strptime(normalized, fmt)
@@ -172,14 +173,24 @@ def simulate_event(event_id: str):
 def list_upcoming_events():
     db = SessionLocal()
     try:
+        # Get events from both upcoming and completed pages (for today's events)
         raw_events = get_upcoming_event_links()
+        # Also check completed events from the last 3 days to catch recent/ongoing events
+        completed_recent = get_completed_event_links(days_back=3)
+        # Merge and deduplicate by URL
+        seen_urls = {e["url"] for e in raw_events}
+        for e in completed_recent:
+            if e["url"] not in seen_urls:
+                raw_events.append(e)
+                seen_urls.add(e["url"])
+        
         ongoing_events = []
         upcoming_events = []
 
         for e in raw_events:
             event_id = e["url"].split("/")[-1]
             event_url = e["url"]
-            is_ongoing = is_event_ongoing(event_url)
+            has_any_results, all_fights_complete, total_fights = check_event_completion_status(event_url)
 
             event_date = (
                 db.query(FightResult.event_date)
@@ -191,32 +202,90 @@ def list_upcoming_events():
                 .first()
             )
 
-            fallback_date = None
-            if not event_date and e.get("date"):
-                fallback_date = e["date"].strftime("%Y-%m-%d")
-            elif not event_date and e.get("date_text"):
-                fallback_date = _format_event_date(e["date_text"])
-
             event_date_value = event_date[0] if event_date else None
 
             iso_date = None
             display_date = None
+            event_date_obj_for_comparison = None
 
+            # Try to get date from database first
             if event_date_value:
                 iso_date = _format_event_date(event_date_value)
                 display_date = event_date_value
-            elif fallback_date:
-                iso_date = fallback_date
-                display_date = e.get("date_text") or fallback_date
-            else:
-                display_date = e.get("date_text")
+                try:
+                    event_date_obj_for_comparison = datetime.strptime(iso_date, "%Y-%m-%d").date()
+                except (ValueError, AttributeError):
+                    pass
+            # Fallback to scraped date (datetime object)
+            elif e.get("date") and isinstance(e.get("date"), datetime):
+                event_date_obj_for_comparison = e.get("date").date()
+                iso_date = e.get("date").strftime("%Y-%m-%d")
+                display_date = e.get("date")
+            # Fallback to scraped date_text (string)
+            elif e.get("date_text"):
+                fallback_date = _format_event_date(e["date_text"])
+                if fallback_date:
+                    iso_date = fallback_date
+                    display_date = e.get("date_text")
+                    try:
+                        event_date_obj_for_comparison = datetime.strptime(iso_date, "%Y-%m-%d").date()
+                    except (ValueError, AttributeError):
+                        pass
 
+            # Format display date string
             if isinstance(display_date, datetime):
                 display_date_str = display_date.strftime("%b %d, %Y")
             elif display_date is not None:
                 display_date_str = str(display_date)
             else:
                 display_date_str = None
+
+            # Check if event is happening today or yesterday (even if no results yet)
+            # Events from yesterday might still be processing results
+            is_recent = False
+            today = date.today()
+            yesterday = today - timedelta(days=1)
+            if event_date_obj_for_comparison:
+                is_today = event_date_obj_for_comparison == today
+                is_yesterday = event_date_obj_for_comparison == yesterday
+                is_recent = is_today or is_yesterday
+            else:
+                logger.warning(f"Event: {e['title']}, Could not parse date. event_date_value: {event_date_value}, scraped date: {e.get('date')}, date_text: {e.get('date_text')}")
+
+            # Event is ongoing only if it's recent (today/yesterday) AND not all fights are complete
+            # Once all fights have results, the event is completed and no longer ongoing
+            is_ongoing = is_recent and not all_fights_complete
+            
+            # Filter out completed events that are not in the future
+            # Only show events that are ongoing (recent and incomplete) or upcoming (future)
+            should_filter = False
+            if event_date_obj_for_comparison:
+                is_future = event_date_obj_for_comparison > today
+                is_past = event_date_obj_for_comparison < today
+                
+                # Filter out if:
+                # 1. Not future AND all fights complete (definitely completed)
+                # 2. Past (before yesterday) AND has any results (old completed events)
+                #    Note: We don't filter yesterday's events here because they might still be ongoing
+                if not is_future and all_fights_complete:
+                    should_filter = True
+                elif is_past and not is_recent and has_any_results:
+                    # If event is in the past (before yesterday) and has results, it's likely completed
+                    # (even if we couldn't count all fights correctly)
+                    # But don't filter recent events (yesterday/today) as they might still be ongoing
+                    should_filter = True
+            elif all_fights_complete:
+                # If we can't parse the date but all fights are complete, filter it out
+                should_filter = True
+            elif has_any_results and not is_recent:
+                # If event has results but isn't recent and we can't parse date, filter it out
+                # (safer to hide events with results that aren't recent)
+                should_filter = True
+            
+            # Skip events that are completed and not in the future
+            if should_filter:
+                logger.info(f"Filtering out completed event: {e['title']} (date: {event_date_obj_for_comparison or 'unknown'}, all_complete: {all_fights_complete}, has_results: {has_any_results}, total_fights: {total_fights})")
+                continue
 
             event_data = {
                 "id": event_id,
