@@ -8,6 +8,7 @@ import logging
 import traceback
 import time
 from datetime import datetime, timedelta
+from sqlalchemy import or_, and_
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.executors.pool import ThreadPoolExecutor
@@ -17,6 +18,7 @@ from src.db import (
     ModelPrediction,
     Fighter,
     SchedulerMetadata,
+    FightResult,
     upsert_fight_result,
 )
 from src.ufc_scraper import get_upcoming_event_links, get_fight_card
@@ -37,9 +39,18 @@ class UFCScheduler:
         self.database_url = database_url
         
         # Configure job store to use the same database
-        jobstores = {
-            'default': SQLAlchemyJobStore(url=database_url, tablename='scheduled_jobs')
-        }
+        # Wrap in try-except to handle serialization errors from corrupted jobs
+        try:
+            jobstores = {
+                'default': SQLAlchemyJobStore(url=database_url, tablename='scheduled_jobs')
+            }
+        except Exception as e:
+            logger.warning(f"Failed to initialize job store, using memory store: {e}")
+            # Fallback to memory store if database store fails
+            from apscheduler.jobstores.memory import MemoryJobStore
+            jobstores = {
+                'default': MemoryJobStore()
+            }
         
         # Single-threaded executor for Azure App Service
         executors = {
@@ -53,12 +64,24 @@ class UFCScheduler:
             'misfire_grace_time': 600  # 10 minutes grace period
         }
         
-        self.scheduler = BackgroundScheduler(
-            jobstores=jobstores,
-            executors=executors,
-            job_defaults=job_defaults,
-            timezone='UTC'  # Always use UTC for consistency
-        )
+        try:
+            self.scheduler = BackgroundScheduler(
+                jobstores=jobstores,
+                executors=executors,
+                job_defaults=job_defaults,
+                timezone='UTC'  # Always use UTC for consistency
+            )
+        except Exception as e:
+            logger.error(f"Failed to initialize scheduler: {e}")
+            logger.error(traceback.format_exc())
+            # Create scheduler without job store if initialization fails
+            from apscheduler.jobstores.memory import MemoryJobStore
+            self.scheduler = BackgroundScheduler(
+                jobstores={'default': MemoryJobStore()},
+                executors=executors,
+                job_defaults=job_defaults,
+                timezone='UTC'
+            )
         
         # Add event listeners for monitoring
         self.scheduler.add_listener(self._job_executed, EVENT_JOB_EXECUTED)
@@ -84,7 +107,10 @@ class UFCScheduler:
                 self._setup_jobs()
             except Exception as e:
                 logger.error(f"Failed to start scheduler: {e}")
-                raise
+                logger.error(traceback.format_exc())
+                # Don't raise - allow scheduler to continue without jobs
+                # This is acceptable since we're using manual triggers anyway
+                logger.warning("Scheduler will continue without automatic jobs (manual triggers still work)")
     
     def shutdown(self):
         """Gracefully shutdown the scheduler"""
@@ -502,7 +528,7 @@ class UFCScheduler:
         """Handle missed job executions"""
         logger.warning(f"Job '{event.job_id}' was missed")
     
-    def _retrain_ml_model(self, min_new_results: int = 10):
+    def _retrain_ml_model(self, min_new_results: int = 10, force: bool = False):
         """Retrain the ML model if sufficient new results are available"""
         try:
             logger.info("Checking if ML model retraining is needed...")
@@ -527,9 +553,12 @@ class UFCScheduler:
             
             logger.info(f"Found {new_results_count} new fight results since last retraining")
             
-            if new_results_count < min_new_results:
+            if not force and new_results_count < min_new_results:
                 logger.info(f"Not enough new results ({new_results_count} < {min_new_results}), skipping retraining")
                 return {"message": f"Insufficient new results ({new_results_count} < {min_new_results})", "retrained": False}
+            
+            if force:
+                logger.info("Force retraining enabled - bypassing new results check")
             
             # Trigger retraining process
             logger.info(f"Retraining ML model with {new_results_count} new results...")
@@ -558,12 +587,17 @@ class UFCScheduler:
             finally:
                 db.close()
             
+            message = f"ML model retrained with {new_results_count} new results"
+            if force and new_results_count == 0:
+                message = "ML model retrained (forced, no new results)"
+            
             return {
-                "message": f"ML model retrained with {new_results_count} new results",
+                "message": message,
                 "retrained": True,
                 "new_results_count": new_results_count,
                 "model_metrics": model_metrics,
-                "timestamp": timestamp.isoformat()
+                "timestamp": timestamp.isoformat(),
+                "forced": force
             }
             
         except Exception as e:
@@ -571,14 +605,15 @@ class UFCScheduler:
             logger.error(traceback.format_exc())
             return {"error": str(e), "retrained": False}
 
-    def retrain_ml_model_manual(self, min_new_results: int = 5):
+    def retrain_ml_model_manual(self, min_new_results: int = 5, force: bool = False):
         """Manual trigger for ML model retraining (called from API)"""
         try:
-            logger.info("Manual trigger: ML model retraining...")
-            result = self._retrain_ml_model(min_new_results)
+            logger.info(f"Manual trigger: ML model retraining (min_new_results={min_new_results}, force={force})...")
+            result = self._retrain_ml_model(min_new_results, force=force)
             return result
         except Exception as e:
             logger.error(f"Manual ML retraining failed: {e}")
+            logger.error(traceback.format_exc())
             return {"error": str(e), "retrained": False}
 
     def cleanup_old_predictions_manual(self):
@@ -1010,15 +1045,35 @@ def _regenerate_future_predictions(db):
             return None
         
         today = datetime.utcnow().date()
+        # Only regenerate ML model predictions (not ensemble or sim)
         pending_predictions = db.query(ModelPrediction).filter(
-            ModelPrediction.actual_winner.is_(None)
+            ModelPrediction.actual_winner.is_(None),
+            ModelPrediction.model == "ml"
         ).all()
+        
+        logger.info(f"Found {len(pending_predictions)} pending ML predictions to potentially regenerate")
+        
+        # Log all predictions being processed for debugging
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug("Pending predictions to process:")
+            for pred in pending_predictions:
+                logger.debug(f"  - {pred.fighter_a} vs {pred.fighter_b} (ID: {pred.id}, timestamp: {pred.timestamp})")
         
         regenerated_count = 0
         skipped_count = 0
+        error_count = 0
         
-        for prediction in pending_predictions:
-            # Check if this prediction is for a future event
+        for idx, prediction in enumerate(pending_predictions, 1):
+            fight_key = f"{prediction.fighter_a} vs {prediction.fighter_b}"
+            logger.info(f"Processing prediction {idx}/{len(pending_predictions)}: {fight_key} (ID: {prediction.id}, model: {prediction.model}, current timestamp: {prediction.timestamp})")
+            
+            # Since we're only querying predictions with actual_winner.is_(None), 
+            # these are all pending predictions for future events.
+            # However, we should still check if there's a recent fight_result that might indicate
+            # this is actually a past event that just hasn't been updated yet.
+            # Only skip if there's a fight_result with a date in the past AND it's very recent (within last 7 days)
+            # This handles the case where a fight just happened but the prediction hasn't been updated yet.
+            
             fight_result = db.query(FightResult).filter(
                 or_(
                     and_(
@@ -1032,26 +1087,44 @@ def _regenerate_future_predictions(db):
                 )
             ).order_by(FightResult.id.desc()).first()
             
-            # If no fight_result, assume it's a future event (no results yet)
-            # If fight_result exists, check if event_date is in the future
+            # Since the prediction has actual_winner=None, it's a pending prediction.
+            # We should regenerate it UNLESS there's a very recent fight_result (within last 3 days)
+            # that indicates the fight just happened and the prediction just hasn't been updated yet.
+            # This prevents skipping rematches where there's an old fight_result from a previous fight.
             is_future_event = True
             if fight_result and fight_result.event_date:
                 event_date = parse_event_date(fight_result.event_date)
                 if event_date:
-                    is_future_event = event_date > today
+                    days_ago = (today - event_date).days
+                    # Only skip if the fight was very recent (within 3 days) and in the past
+                    # This means it likely just happened and the prediction just hasn't been updated yet
+                    # For older fight results (rematches), we'll still regenerate
+                    if days_ago >= 0 and days_ago <= 3:
+                        is_future_event = False
+                        logger.info(f"Skipping {fight_key} - fight result from {days_ago} days ago suggests fight just completed (event: {fight_result.event if hasattr(fight_result, 'event') else 'N/A'})")
+                    else:
+                        logger.debug(f"Found old fight result for {fight_key} from {days_ago} days ago (likely from previous fight) - will regenerate for rematch")
             
             if not is_future_event:
                 skipped_count += 1
+                logger.debug(f"Skipping {prediction.fighter_a} vs {prediction.fighter_b} - recent past event (event date: {fight_result.event_date if fight_result else 'N/A'})")
                 continue
             
             # Regenerate prediction with new model
             try:
+                logger.debug(f"Regenerating prediction for {prediction.fighter_a} vs {prediction.fighter_b}")
                 result = get_ensemble_prediction(
                     prediction.fighter_a,
                     prediction.fighter_b,
                     model_type=prediction.model,
                     log_to_db=False  # We'll update manually
                 )
+                
+                if not result or "error" in result:
+                    error_msg = result.get("error", "Unknown error") if result else "No result returned"
+                    logger.warning(f"Failed to get prediction result for {prediction.fighter_a} vs {prediction.fighter_b}: {error_msg}")
+                    error_count += 1
+                    continue
                 
                 # Update existing prediction with new values
                 prediction.predicted_winner = prediction.fighter_a if result["fighter_a_win_prob"] > 50 else prediction.fighter_b
@@ -1074,14 +1147,33 @@ def _regenerate_future_predictions(db):
                     if "age_diff" in diffs:
                         prediction.age_diff = int(diffs["age_diff"]) if diffs["age_diff"] is not None else None
                 
+                # Flush to ensure changes are in the session before commit
+                db.flush()
                 regenerated_count += 1
+                logger.info(f"✅ Successfully regenerated prediction for {prediction.fighter_a} vs {prediction.fighter_b} (ID: {prediction.id}, new timestamp: {prediction.timestamp})")
                 
             except Exception as e:
-                logger.warning(f"Failed to regenerate prediction for {prediction.fighter_a} vs {prediction.fighter_b} ({prediction.model}): {e}")
+                logger.warning(f"Failed to regenerate prediction for {prediction.fighter_a} vs {prediction.fighter_b} ({prediction.model}, ID: {prediction.id}): {e}")
+                logger.warning(traceback.format_exc())
+                error_count += 1
+                # Don't rollback - continue with other predictions
+                # We'll commit all successful updates at the end
                 continue
         
-        db.commit()
-        logger.info(f"Regenerated {regenerated_count} pending predictions for future events (skipped {skipped_count} past events)")
+        try:
+            db.commit()
+            logger.info(f"✅ Successfully regenerated {regenerated_count} pending predictions for future events")
+            if skipped_count > 0:
+                logger.info(f"⏭️  Skipped {skipped_count} predictions (recent past events within 3 days)")
+            if error_count > 0:
+                logger.warning(f"❌ Failed to regenerate {error_count} predictions - check logs above for details")
+        except Exception as e:
+            logger.error(f"Failed to commit regenerated predictions: {e}")
+            db.rollback()
+            raise
+        
+        if error_count > 0:
+            logger.warning(f"Failed to regenerate {error_count} predictions - check logs above for details")
         
     except Exception as e:
         logger.error(f"Error regenerating future predictions: {e}")

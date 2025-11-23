@@ -691,14 +691,23 @@ def resume_scheduler():
         return {"error": str(e)}
 
 @app.post("/retrain-ml-model")
-def retrain_ml_model_endpoint(min_new_results: int = Query(5, description="Minimum new results required to trigger retraining")):
+def retrain_ml_model_endpoint(
+    min_new_results: int = Query(5, description="Minimum new results required to trigger retraining"),
+    force: bool = Query(False, description="Force retraining even without new results (for testing)")
+):
     """Manual trigger to retrain the ML model with latest fight results"""
     try:
+        # Ensure force is a proper boolean (handle string "True"/"False" from query params)
+        if isinstance(force, str):
+            force = force.lower() in ('true', '1', 'yes')
+        
+        logger.info(f"Retraining request: min_new_results={min_new_results}, force={force}")
         scheduler = get_scheduler()
-        result = scheduler.retrain_ml_model_manual(min_new_results)
+        result = scheduler.retrain_ml_model_manual(min_new_results, force=force)
         return result
     except Exception as e:
         logger.error(f"ML retraining endpoint failed: {e}")
+        logger.error(traceback.format_exc())
         return {"error": str(e), "retrained": False}
 
 # Debug endpoints - only available in development
