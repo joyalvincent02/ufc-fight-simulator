@@ -52,10 +52,10 @@ export default function HomePage() {
 
   useEffect(() => {
     // Load event data
-    getEvents().then((events) => {
+    getEvents().then((events: NextEvent[]) => {
       if (events.length === 0) return;
       // Prioritize ongoing events, otherwise use the first event
-      const selectedEvent = events.find(e => e.status === "ongoing") || events[0];
+      const selectedEvent = events.find((e: NextEvent) => e.status === "ongoing") || events[0];
       setNextEvent(selectedEvent);
 
       simulateEvent(selectedEvent.id)
