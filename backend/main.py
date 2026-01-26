@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from src.fight_model import calculate_exchange_probabilities
 from src.simulate_fight import simulate_fight
-from src.ufc_scraper import get_upcoming_event_links, get_completed_event_links, get_fight_card, is_event_ongoing, check_event_completion_status
+from src.ufc_scraper import get_upcoming_event_links, get_completed_event_links, get_fight_card, is_event_ongoing
 from src.fighter_scraper import scrape_fighter_stats, save_fighter_to_db
 from src.db import SessionLocal, Fighter, ModelPrediction, FightResult
 from src.ensemble_predict import get_ensemble_prediction
@@ -190,7 +190,7 @@ def list_upcoming_events():
         for e in raw_events:
             event_id = e["url"].split("/")[-1]
             event_url = e["url"]
-            has_any_results, all_fights_complete, total_fights = check_event_completion_status(event_url)
+            has_results = is_event_ongoing(event_url)
 
             event_date = (
                 db.query(FightResult.event_date)
@@ -252,40 +252,8 @@ def list_upcoming_events():
             else:
                 logger.warning(f"Event: {e['title']}, Could not parse date. event_date_value: {event_date_value}, scraped date: {e.get('date')}, date_text: {e.get('date_text')}")
 
-            # Event is ongoing only if it's recent (today/yesterday) AND not all fights are complete
-            # Once all fights have results, the event is completed and no longer ongoing
-            is_ongoing = is_recent and not all_fights_complete
-            
-            # Filter out completed events that are not in the future
-            # Only show events that are ongoing (recent and incomplete) or upcoming (future)
-            should_filter = False
-            if event_date_obj_for_comparison:
-                is_future = event_date_obj_for_comparison > today
-                is_past = event_date_obj_for_comparison < today
-                
-                # Filter out if:
-                # 1. Not future AND all fights complete (definitely completed)
-                # 2. Past (before yesterday) AND has any results (old completed events)
-                #    Note: We don't filter yesterday's events here because they might still be ongoing
-                if not is_future and all_fights_complete:
-                    should_filter = True
-                elif is_past and not is_recent and has_any_results:
-                    # If event is in the past (before yesterday) and has results, it's likely completed
-                    # (even if we couldn't count all fights correctly)
-                    # But don't filter recent events (yesterday/today) as they might still be ongoing
-                    should_filter = True
-            elif all_fights_complete:
-                # If we can't parse the date but all fights are complete, filter it out
-                should_filter = True
-            elif has_any_results and not is_recent:
-                # If event has results but isn't recent and we can't parse date, filter it out
-                # (safer to hide events with results that aren't recent)
-                should_filter = True
-            
-            # Skip events that are completed and not in the future
-            if should_filter:
-                logger.info(f"Filtering out completed event: {e['title']} (date: {event_date_obj_for_comparison or 'unknown'}, all_complete: {all_fights_complete}, has_results: {has_any_results}, total_fights: {total_fights})")
-                continue
+            # Event is ongoing if it has results OR if it's happening today/yesterday (might still be processing)
+            is_ongoing = has_results or is_recent
 
             event_data = {
                 "id": event_id,
@@ -691,23 +659,14 @@ def resume_scheduler():
         return {"error": str(e)}
 
 @app.post("/retrain-ml-model")
-def retrain_ml_model_endpoint(
-    min_new_results: int = Query(5, description="Minimum new results required to trigger retraining"),
-    force: bool = Query(False, description="Force retraining even without new results (for testing)")
-):
+def retrain_ml_model_endpoint(min_new_results: int = Query(5, description="Minimum new results required to trigger retraining")):
     """Manual trigger to retrain the ML model with latest fight results"""
     try:
-        # Ensure force is a proper boolean (handle string "True"/"False" from query params)
-        if isinstance(force, str):
-            force = force.lower() in ('true', '1', 'yes')
-        
-        logger.info(f"Retraining request: min_new_results={min_new_results}, force={force}")
         scheduler = get_scheduler()
-        result = scheduler.retrain_ml_model_manual(min_new_results, force=force)
+        result = scheduler.retrain_ml_model_manual(min_new_results)
         return result
     except Exception as e:
         logger.error(f"ML retraining endpoint failed: {e}")
-        logger.error(traceback.format_exc())
         return {"error": str(e), "retrained": False}
 
 # Debug endpoints - only available in development

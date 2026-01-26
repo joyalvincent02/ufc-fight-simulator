@@ -5,12 +5,8 @@ from sklearn.model_selection import cross_val_score, RandomizedSearchCV
 from sklearn.calibration import CalibratedClassifierCV
 import joblib
 import os
-import warnings
 from src.azure_config import get_dataset_path, get_model_path
 import numpy as np
-
-# Suppress XGBoost deprecation warnings
-warnings.filterwarnings('ignore', category=UserWarning, module='xgboost')
 
 def train_model(dataset_path=None, model_path=None, use_hyperparameter_tuning=True, n_iter=30):
     """
@@ -44,14 +40,6 @@ def train_model(dataset_path=None, model_path=None, use_hyperparameter_tuning=Tr
     if use_hyperparameter_tuning and len(df) > 100:  # Only tune if we have enough data
         print("Performing hyperparameter tuning...")
         
-        # Suppress XGBoost warnings during hyperparameter tuning
-        import logging
-        import os
-        xgb_logger = logging.getLogger('xgboost')
-        xgb_logger.setLevel(logging.ERROR)
-        # Suppress XGBoost C++ warnings
-        os.environ['PYTHONWARNINGS'] = 'ignore'
-        
         # Define parameter grid for RandomizedSearchCV
         param_distributions = {
             'n_estimators': [100, 200, 300],
@@ -67,7 +55,8 @@ def train_model(dataset_path=None, model_path=None, use_hyperparameter_tuning=Tr
         base_model = xgb.XGBClassifier(
             scale_pos_weight=scale_pos_weight,
             random_state=42,
-            eval_metric='logloss'
+            eval_metric='logloss',
+            use_label_encoder=False
         )
         
         # Randomized search with 5-fold CV
@@ -79,15 +68,10 @@ def train_model(dataset_path=None, model_path=None, use_hyperparameter_tuning=Tr
             scoring='accuracy',
             n_jobs=-1,
             random_state=42,
-            verbose=0  # Set to 0 to reduce output
+            verbose=1
         )
         
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            random_search.fit(X, y)
-        
-        # Restore logging level
-        xgb_logger.setLevel(logging.WARNING)
+        random_search.fit(X, y)
         best_model = random_search.best_estimator_
         
         print(f"Best parameters: {random_search.best_params_}")
@@ -104,7 +88,8 @@ def train_model(dataset_path=None, model_path=None, use_hyperparameter_tuning=Tr
             min_child_weight=3,
             scale_pos_weight=scale_pos_weight,
             random_state=42,
-            eval_metric='logloss'
+            eval_metric='logloss',
+            use_label_encoder=False
         )
         best_model.fit(X, y)
 
