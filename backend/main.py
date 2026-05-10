@@ -9,6 +9,7 @@ from src.fighter_scraper import scrape_fighter_stats, save_fighter_to_db
 from src.db import SessionLocal, Fighter, ModelPrediction, FightResult
 from src.ensemble_predict import get_ensemble_prediction
 from src.ufc_scheduler import start_scheduler, stop_scheduler, get_scheduler
+import math
 from types import SimpleNamespace
 from bs4 import BeautifulSoup
 from sqlalchemy import func, or_, and_
@@ -458,11 +459,17 @@ def get_model_performance():
         recent_accuracy = (len(recent_correct) / len(recent_predictions) * 100) if recent_predictions else 0
         
         # Calculate average confidence (using highest probability from each prediction)
-        predictions_with_confidence = [p for p in predictions if p.fighter_a_prob is not None and p.fighter_b_prob is not None]
+        predictions_with_confidence = [
+            p for p in predictions
+            if p.fighter_a_prob is not None and p.fighter_b_prob is not None
+            and not math.isnan(p.fighter_a_prob) and not math.isnan(p.fighter_b_prob)
+        ]
         if predictions_with_confidence:
             total_confidence = sum(max(p.fighter_a_prob, p.fighter_b_prob) for p in predictions_with_confidence)
             avg_confidence = total_confidence / len(predictions_with_confidence)
         else:
+            avg_confidence = 0
+        if math.isnan(avg_confidence) or math.isinf(avg_confidence):
             avg_confidence = 0
         
         # Break down by model
@@ -487,16 +494,21 @@ def get_model_performance():
                 best_model = model_name
                 best_accuracy = stats["accuracy"]
         
+        def safe_round(v, n=1):
+            if math.isnan(v) or math.isinf(v):
+                return 0.0
+            return round(v, n)
+
         return {
-            "overall_accuracy": round(overall_accuracy, 1),
+            "overall_accuracy": safe_round(overall_accuracy),
             "total_predictions": total_predictions,
             "predictions_with_results": len(predictions_with_results),
             "correct_predictions": len(correct_predictions),
-            "recent_accuracy": round(recent_accuracy, 1),
+            "recent_accuracy": safe_round(recent_accuracy),
             "recent_predictions_count": len(recent_predictions),
             "best_model": best_model,
-            "best_model_accuracy": round(best_accuracy, 1),
-            "avg_confidence": round(avg_confidence, 1),
+            "best_model_accuracy": safe_round(best_accuracy),
+            "avg_confidence": safe_round(avg_confidence),
             "model_breakdown": model_breakdown
         }
     

@@ -4,26 +4,27 @@ import joblib
 import os
 from src.azure_config import get_model_path
 
-def load_model():
-    """Load the ML model with Azure-compatible path"""
-    model_path = get_model_path()
-    try:
-        return joblib.load(model_path)
-    except FileNotFoundError:
-        # Fallback to local path for development
-        if os.path.exists("src/ml/fight_predictor.pkl"):
-            return joblib.load("src/ml/fight_predictor.pkl")
-        else:
-            raise FileNotFoundError(f"Model not found at {model_path} or src/ml/fight_predictor.pkl")
+_model = None
+_model_mtime = None
 
-# Load model on import
-model = load_model()
+def load_model():
+    """Load the ML model, returning cached version if unchanged."""
+    global _model, _model_mtime
+    model_path = get_model_path()
+
+    for path in [model_path, "src/ml/fight_predictor.pkl"]:
+        if os.path.exists(path):
+            mtime = os.path.getmtime(path)
+            if _model is None or mtime != _model_mtime:
+                _model = joblib.load(path)
+                _model_mtime = mtime
+            return _model
+
+    raise FileNotFoundError(f"Model not found at {model_path} or src/ml/fight_predictor.pkl")
 
 def predict_fight_outcome(name_a, name_b):
     from src.db import SessionLocal, Fighter
 
-    # Reload model in case it was retrained
-    global model
     model = load_model()
 
     db = SessionLocal()
