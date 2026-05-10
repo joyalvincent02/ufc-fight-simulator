@@ -1,4 +1,4 @@
-name: Keep Azure App Warm
+name: Keep Apps Warm
 
 on:
   schedule:
@@ -15,31 +15,51 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Ping Health Endpoint
+    - name: Ping Render Backend
       run: |
-        echo "🏃‍♂️ Keeping Azure App Service warm..."
-        echo "🕒 Current time: $(date -u)"
+        echo "Keeping Render app warm..."
+        echo "Current time: $(date -u)"
         
-        # Simple health check to prevent app from sleeping
+        response=$(curl -s -w "%{http_code}" -m 30 "${{ secrets.RENDER_APP_URL }}/health")
+        
+        if [ "$response" = "200" ]; then
+          echo "Render: healthy and warm"
+        elif [[ "$response" =~ ^[0-9]{3}$ ]]; then
+          echo "Render: responded with HTTP $response"
+        else
+          echo "Render: may be sleeping or unreachable"
+        fi
+        
+        status_response=$(curl -s -w "%{http_code}" -m 15 "${{ secrets.RENDER_APP_URL }}/scheduler/status" | tail -c 3)
+        
+        if [ "$status_response" = "200" ]; then
+          echo "Render scheduler status: OK"
+        else
+          echo "Render scheduler status: HTTP $status_response"
+        fi
+
+    - name: Ping Azure Backend
+      run: |
+        echo "Keeping Azure app warm..."
+        
         response=$(curl -s -w "%{http_code}" -m 30 "${{ secrets.AZURE_APP_URL }}/health")
         
         if [ "$response" = "200" ]; then
-          echo "✅ App is healthy and warm"
+          echo "Azure: healthy and warm"
         elif [[ "$response" =~ ^[0-9]{3}$ ]]; then
-          echo "⚠️ App responded with HTTP $response"
+          echo "Azure: responded with HTTP $response"
         else
-          echo "❌ App may be sleeping or unreachable"
+          echo "Azure: may be sleeping or unreachable"
         fi
         
-        # Quick status check (lightweight)
         status_response=$(curl -s -w "%{http_code}" -m 15 "${{ secrets.AZURE_APP_URL }}/scheduler/status" | tail -c 3)
         
         if [ "$status_response" = "200" ]; then
-          echo "📊 Scheduler status check: OK"
+          echo "Azure scheduler status: OK"
         else
-          echo "📊 Scheduler status check: HTTP $status_response"
+          echo "Azure scheduler status: HTTP $status_response"
         fi
 
     - name: Log Activity
       run: |
-        echo "📝 Keep-warm activity logged at $(date -u)" >> $GITHUB_STEP_SUMMARY
+        echo "Keep-warm activity logged at $(date -u)" >> $GITHUB_STEP_SUMMARY

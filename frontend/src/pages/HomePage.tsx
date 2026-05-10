@@ -276,7 +276,7 @@ export default function HomePage() {
             {
               icon: <FlashOnOutlined className="text-4xl" />,
               title: "Live Stats + Fast Results",
-              desc: "Pulls fresh fighter stats from UFCStats.com. Powered by FastAPI, React, and deployed via Azure with automated CI/CD.",
+              desc: "Pulls fresh fighter stats from UFCStats.com. Powered by FastAPI, React, and deployed via Vercel and Render with automated CI/CD.",
             },
           ].map((item, i) => (
             <div

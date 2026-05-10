@@ -21,49 +21,52 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Execute UFC Action
+    - name: Execute UFC Action on Both Backends
       run: |
-        echo "🎯 Calling endpoint: ${{ github.event.inputs.endpoint }}"
+        echo "Calling endpoint: ${{ github.event.inputs.endpoint }}"
         
-        # Wake up the app first
-        echo "🌅 Waking up Azure App..."
-        curl -f -m 30 "${{ secrets.AZURE_APP_URL }}/health" || echo "App might be sleeping"
-        sleep 5
-        
-        # Determine HTTP method
         if [[ "${{ github.event.inputs.endpoint }}" == "/health" || "${{ github.event.inputs.endpoint }}" == "/scheduler/status" ]]; then
           method="GET"
         else
           method="POST"
         fi
         
-        echo "📤 Making $method request to ${{ github.event.inputs.endpoint }}"
-        
-        # Make the request
-        if [ "$method" = "GET" ]; then
-          response=$(curl -s -w "\n%{http_code}" "${{ secrets.AZURE_APP_URL }}${{ github.event.inputs.endpoint }}")
-        else
-          response=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.AZURE_APP_URL }}${{ github.event.inputs.endpoint }}")
-        fi
-        
-        http_code=$(echo "$response" | tail -n1)
-        body=$(echo "$response" | head -n -1)
-        
-        echo "📊 Response Code: $http_code"
-        echo "📝 Response:"
-        echo "$body" | jq . 2>/dev/null || echo "$body"
-        
-        if [ "$http_code" -eq 200 ]; then
-          echo "✅ Request successful!"
-        else
-          echo "❌ Request failed (HTTP $http_code)"
-          exit 1
-        fi
+        for BACKEND in "Render:${{ secrets.RENDER_APP_URL }}" "Azure:${{ secrets.AZURE_APP_URL }}"; do
+          NAME="${BACKEND%%:*}"
+          URL="${BACKEND#*:}"
+          
+          echo "--- $NAME ---"
+          echo "Waking up $NAME..."
+          curl -f -m 30 "$URL/health" || echo "$NAME may be sleeping"
+          sleep 5
+          
+          echo "Making $method request to ${{ github.event.inputs.endpoint }} on $NAME..."
+          
+          if [ "$method" = "GET" ]; then
+            response=$(curl -s -w "\n%{http_code}" "$URL${{ github.event.inputs.endpoint }}")
+          else
+            response=$(curl -s -w "\n%{http_code}" -X POST "$URL${{ github.event.inputs.endpoint }}")
+          fi
+          
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n -1)
+          
+          echo "$NAME response ($http_code):"
+          echo "$body" | jq . 2>/dev/null || echo "$body"
+          
+          if [ "$http_code" -eq 200 ]; then
+            echo "$NAME: request successful"
+          else
+            echo "$NAME: request failed (HTTP $http_code)"
+            exit 1
+          fi
+        done
 
     - name: Create Summary
       run: |
-        echo "## 🎯 Quick Action Results" >> $GITHUB_STEP_SUMMARY
+        echo "## Quick Action Results" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Endpoint:** \`${{ github.event.inputs.endpoint }}\`" >> $GITHUB_STEP_SUMMARY
         echo "**Time:** $(date -u)" >> $GITHUB_STEP_SUMMARY
-        echo "**Status:** ✅ Success" >> $GITHUB_STEP_SUMMARY
+        echo "**Backends:** Render + Azure" >> $GITHUB_STEP_SUMMARY
+        echo "**Status:** Success" >> $GITHUB_STEP_SUMMARY
