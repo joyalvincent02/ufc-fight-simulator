@@ -1,69 +1,66 @@
-# React + TypeScript + Vite
+# MMA Math – Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + TypeScript + Vite client for MMA Math. Communicates with the FastAPI backend to display upcoming events, run fight predictions, and track model accuracy.
 
-Currently, two official plugins are available:
+## Tech stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **React 19** with React Router v7
+- **TypeScript**
+- **Vite** (dev server + build)
+- **Material UI (MUI v7)** – component library
+- **Tailwind CSS** – utility styles
+- **react-katex** – rendering math formulas on the Models page
 
-## Expanding the ESLint configuration
+## Pages
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+| Route | Page | Description |
+|---|---|---|
+| `/` | Home | Landing page with feature overview |
+| `/events` | Events | Upcoming and live UFC events |
+| `/simulate/:eventId` | Simulate | Full-card predictions for a selected event |
+| `/custom` | Custom Sim | Pick any two stored fighters and run a prediction |
+| `/models` | Models | Explanation of the three prediction models with math |
+| `/results` | Results | Historical prediction accuracy and full prediction log |
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Environment variables
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+| Variable | Default | Description |
+|---|---|---|
+| `VITE_API_BASE_URL` | `http://localhost:8000` | Base URL of the FastAPI backend |
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Create a `.env.local` file in this folder to override locally:
+
+```
+VITE_API_BASE_URL=http://localhost:8000
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Development
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+npm install
+npm run dev
+```
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Build
+
+```bash
+npm run build
+# Output is written to dist/
+```
+
+## Deployment
+
+The frontend is deployed to **Azure Static Web Apps** on every push to `master` via the GitHub Actions workflow at `.github/workflows/azure-static-web-apps-lemon-coast-0fe789600.yml`. The `VITE_API_BASE_URL` secret is injected at build time.
+
+## Project structure
+
+```
+src/
+  pages/         One component per route
+  components/    Shared UI components (FighterCard, ModelSelector, etc.)
+  hooks/         Custom React hooks
+  services/      API client functions
+  types/         TypeScript type definitions
+  utils/         Helper functions
+  layouts/       Page layout wrappers
 ```

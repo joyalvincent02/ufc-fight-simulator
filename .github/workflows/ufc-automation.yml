@@ -49,107 +49,85 @@ jobs:
         echo "UFC Automation triggered"
         echo "Current time: $(date -u)"
 
-    - name: Wake up backends
+    - name: Wake up backend
       run: |
-        echo "Waking up Render backend..."
-        curl -f -m 30 "${{ secrets.RENDER_APP_URL }}/health" || echo "Render may be sleeping, continuing anyway..."
         echo "Waking up Azure backend..."
         curl -f -m 30 "${{ secrets.AZURE_APP_URL }}/health" || echo "Azure may be sleeping, continuing anyway..."
         sleep 10
 
     - name: Check UFC Scheduler Status
       run: |
-        echo "Render scheduler status:"
-        curl -f "${{ secrets.RENDER_APP_URL }}/scheduler/status" || echo "Render status check failed"
         echo "Azure scheduler status:"
         curl -f "${{ secrets.AZURE_APP_URL }}/scheduler/status" || echo "Azure status check failed"
 
     - name: Check for New UFC Events
       if: steps.context.outputs.action == 'check-events' || steps.context.outputs.action == 'all'
       run: |
-        for BACKEND in "Render:${{ secrets.RENDER_APP_URL }}" "Azure:${{ secrets.AZURE_APP_URL }}"; do
-          NAME="${BACKEND%%:*}"
-          URL="${BACKEND#*:}"
-          echo "Checking for new UFC events on $NAME..."
-          response=$(curl -s -w "\n%{http_code}" -X POST "$URL/scheduler/check-events")
-          http_code=$(echo "$response" | tail -n1)
-          body=$(echo "$response" | head -n -1)
-          echo "$NAME response ($http_code): $body"
-          if [ "$http_code" -ne 200 ]; then
-            echo "$NAME failed to check events (HTTP $http_code)"
-            exit 1
-          fi
-        done
+        echo "Checking for new UFC events on Azure..."
+        response=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.AZURE_APP_URL }}/scheduler/check-events")
+        http_code=$(echo "$response" | tail -n1)
+        body=$(echo "$response" | head -n -1)
+        echo "Azure response ($http_code): $body"
+        if [ "$http_code" -ne 200 ]; then
+          echo "Azure failed to check events (HTTP $http_code)"
+          exit 1
+        fi
 
     - name: Check Completed Events
       if: steps.context.outputs.action == 'check-results' || steps.context.outputs.action == 'all'
       run: |
-        for BACKEND in "Render:${{ secrets.RENDER_APP_URL }}" "Azure:${{ secrets.AZURE_APP_URL }}"; do
-          NAME="${BACKEND%%:*}"
-          URL="${BACKEND#*:}"
-          echo "Checking completed fight results on $NAME..."
-          response=$(curl -s -w "\n%{http_code}" -X POST "$URL/scheduler/check-results")
-          http_code=$(echo "$response" | tail -n1)
-          body=$(echo "$response" | head -n -1)
-          echo "$NAME response ($http_code): $body"
-          if [ "$http_code" -eq 200 ]; then
-            updated=$(echo "$body" | grep -o '"updated_predictions":[0-9]*' | cut -d':' -f2 || echo "0")
-            pending=$(echo "$body" | grep -o '"pending_predictions":[0-9]*' | cut -d':' -f2 || echo "0")
-            echo "$NAME - Updated: $updated, Pending: $pending"
-          else
-            echo "$NAME failed to check results (HTTP $http_code)"
-            exit 1
-          fi
-        done
+        echo "Checking completed fight results on Azure..."
+        response=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.AZURE_APP_URL }}/scheduler/check-results")
+        http_code=$(echo "$response" | tail -n1)
+        body=$(echo "$response" | head -n -1)
+        echo "Azure response ($http_code): $body"
+        if [ "$http_code" -eq 200 ]; then
+          updated=$(echo "$body" | grep -o '"updated_predictions":[0-9]*' | cut -d':' -f2 || echo "0")
+          pending=$(echo "$body" | grep -o '"pending_predictions":[0-9]*' | cut -d':' -f2 || echo "0")
+          echo "Azure - Updated: $updated, Pending: $pending"
+        else
+          echo "Azure failed to check results (HTTP $http_code)"
+          exit 1
+        fi
 
     - name: Cleanup Old Predictions
       if: steps.context.outputs.action == 'check-results' || steps.context.outputs.action == 'all'
       run: |
-        for BACKEND in "Render:${{ secrets.RENDER_APP_URL }}" "Azure:${{ secrets.AZURE_APP_URL }}"; do
-          NAME="${BACKEND%%:*}"
-          URL="${BACKEND#*:}"
-          echo "Cleaning up old predictions on $NAME..."
-          response=$(curl -s -w "\n%{http_code}" -X POST "$URL/scheduler/cleanup-old-predictions")
-          http_code=$(echo "$response" | tail -n1)
-          body=$(echo "$response" | head -n -1)
-          if [ "$http_code" -eq 200 ]; then
-            deleted=$(echo "$body" | grep -o '"deleted_predictions":[0-9]*' | cut -d':' -f2 || echo "0")
-            echo "$NAME - Deleted predictions: $deleted"
-          else
-            echo "$NAME failed to cleanup predictions (HTTP $http_code)"
-            exit 1
-          fi
-        done
+        echo "Cleaning up old predictions on Azure..."
+        response=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.AZURE_APP_URL }}/scheduler/cleanup-old-predictions")
+        http_code=$(echo "$response" | tail -n1)
+        body=$(echo "$response" | head -n -1)
+        if [ "$http_code" -eq 200 ]; then
+          deleted=$(echo "$body" | grep -o '"deleted_predictions":[0-9]*' | cut -d':' -f2 || echo "0")
+          echo "Azure - Deleted predictions: $deleted"
+        else
+          echo "Azure failed to cleanup predictions (HTTP $http_code)"
+          exit 1
+        fi
 
     - name: Retrain ML Model
       if: steps.context.outputs.action == 'retrain-model' || steps.context.outputs.action == 'all'
       run: |
-        for BACKEND in "Render:${{ secrets.RENDER_APP_URL }}" "Azure:${{ secrets.AZURE_APP_URL }}"; do
-          NAME="${BACKEND%%:*}"
-          URL="${BACKEND#*:}"
-          echo "Triggering ML model retraining on $NAME..."
-          response=$(curl -s -w "\n%{http_code}" -X POST "$URL/retrain-ml-model?min_new_results=5")
-          http_code=$(echo "$response" | tail -n1)
-          body=$(echo "$response" | head -n -1)
-          echo "$NAME response ($http_code): $body"
-          if [ "$http_code" -eq 200 ]; then
-            retrained=$(echo "$body" | grep -o '"retrained":[^,]*' | cut -d':' -f2 || echo "false")
-            if [ "$retrained" = "true" ]; then
-              new_results=$(echo "$body" | grep -o '"new_results_count":[0-9]*' | cut -d':' -f2 || echo "0")
-              echo "$NAME - Model retrained! New results used: $new_results"
-            else
-              echo "$NAME - Retraining skipped (insufficient new data)"
-            fi
+        echo "Triggering ML model retraining on Azure..."
+        response=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.AZURE_APP_URL }}/retrain-ml-model?min_new_results=5")
+        http_code=$(echo "$response" | tail -n1)
+        body=$(echo "$response" | head -n -1)
+        echo "Azure response ($http_code): $body"
+        if [ "$http_code" -eq 200 ]; then
+          retrained=$(echo "$body" | grep -o '"retrained":[^,]*' | cut -d':' -f2 || echo "false")
+          if [ "$retrained" = "true" ]; then
+            new_results=$(echo "$body" | grep -o '"new_results_count":[0-9]*' | cut -d':' -f2 || echo "0")
+            echo "Azure - Model retrained! New results used: $new_results"
           else
-            echo "$NAME failed to retrain (HTTP $http_code)"
-            exit 1
+            echo "Azure - Retraining skipped (insufficient new data)"
           fi
-        done
+        else
+          echo "Azure failed to retrain (HTTP $http_code)"
+          exit 1
+        fi
 
     - name: Final Status Check
       run: |
-        echo "Render final status:"
-        curl -s "${{ secrets.RENDER_APP_URL }}/scheduler/status"
         echo "Azure final status:"
         curl -s "${{ secrets.AZURE_APP_URL }}/scheduler/status"
 
@@ -161,8 +139,7 @@ jobs:
         echo "**Time:** $(date -u)" >> $GITHUB_STEP_SUMMARY
         echo "**Status:** Completed Successfully" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Backends" >> $GITHUB_STEP_SUMMARY
-        echo "- [Render](${{ secrets.RENDER_APP_URL }})" >> $GITHUB_STEP_SUMMARY
+        echo "### Backend" >> $GITHUB_STEP_SUMMARY
         echo "- [Azure](${{ secrets.AZURE_APP_URL }})" >> $GITHUB_STEP_SUMMARY
 
   notify-failure:
