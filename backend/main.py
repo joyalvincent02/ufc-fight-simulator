@@ -524,6 +524,14 @@ def get_detailed_performance():
     try:
         predictions = db.query(ModelPrediction).order_by(ModelPrediction.timestamp.desc()).all()
         
+        def safe_float(v):
+            if v is None:
+                return None
+            try:
+                return None if math.isnan(v) or math.isinf(v) else round(v, 1)
+            except (TypeError, ValueError):
+                return None
+
         detailed_results = []
         for pred in predictions:
             event_info = _get_prediction_event_info(db, pred.fighter_a, pred.fighter_b)
@@ -535,9 +543,9 @@ def get_detailed_performance():
                 "predicted_winner": pred.predicted_winner,
                 "actual_winner": pred.actual_winner,
                 "correct": pred.correct,
-                "fighter_a_prob": pred.fighter_a_prob,
-                "fighter_b_prob": pred.fighter_b_prob,
-                "penalty_score": pred.penalty_score,
+                "fighter_a_prob": safe_float(pred.fighter_a_prob),
+                "fighter_b_prob": safe_float(pred.fighter_b_prob),
+                "penalty_score": safe_float(pred.penalty_score),
                 "timestamp": pred.timestamp.isoformat() if pred.timestamp else None,
                 "has_result": pred.actual_winner is not None,
                 "event": event_info["event"],

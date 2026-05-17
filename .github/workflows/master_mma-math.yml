@@ -45,13 +45,16 @@ jobs:
 
       - name: Wait for app to start
         run: |
-          echo "Waiting for app to become healthy..."
-          for i in {1..12}; do
+          echo "Waiting for app to become healthy (up to 5 minutes)..."
+          for i in {1..30}; do
             status=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.AZURE_APP_URL }}/health" || echo "000")
-            echo "Attempt $i: HTTP $status"
+            echo "Attempt $i/30: HTTP $status"
             if [ "$status" = "200" ]; then
               echo "App is healthy"
               break
+            fi
+            if [ "$i" = "30" ]; then
+              echo "Warning: app did not become healthy in time, proceeding anyway"
             fi
             sleep 10
           done
