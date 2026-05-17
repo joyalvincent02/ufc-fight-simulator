@@ -42,3 +42,29 @@ jobs:
           slot-name: 'Production'
           package: ./backend
           startup-command: 'gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app'
+
+      - name: Wait for app to start
+        run: |
+          echo "Waiting for app to become healthy..."
+          for i in {1..12}; do
+            status=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.AZURE_APP_URL }}/health" || echo "000")
+            echo "Attempt $i: HTTP $status"
+            if [ "$status" = "200" ]; then
+              echo "App is healthy"
+              break
+            fi
+            sleep 10
+          done
+
+      - name: Retrain ML model with current package versions
+        run: |
+          echo "Triggering post-deploy model retrain (runs async on Azure, may take 5-10 min)..."
+          response=$(curl -s -w "\n%{http_code}" --max-time 600 -X POST "${{ secrets.AZURE_APP_URL }}/retrain-ml-model?min_new_results=0")
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n -1)
+          echo "Response ($http_code): $body"
+          if [ "$http_code" -ne 200 ]; then
+            echo "Warning: retrain request failed (HTTP $http_code) - the NaN guard will keep the app running until Monday's scheduled retrain"
+          else
+            echo "Model successfully retrained with current package versions"
+          fi

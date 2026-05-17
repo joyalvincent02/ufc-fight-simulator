@@ -2,7 +2,11 @@ import pandas as pd
 import numpy as np
 import joblib
 import os
+import math
+import logging
 from src.azure_config import get_model_path
+
+logger = logging.getLogger(__name__)
 
 _model = None
 _model_mtime = None
@@ -199,7 +203,18 @@ def predict_fight_outcome(name_a, name_b):
 
     # Build input for model
     input_df = pd.DataFrame([features], columns=model_features)
-    model_prob = model.predict_proba(input_df)[0]  # [prob_fighter_b_win, prob_fighter_a_win]
+    raw_prob = model.predict_proba(input_df)[0]  # [prob_fighter_b_win, prob_fighter_a_win]
+
+    # Guard against NaN from model version mismatches (e.g. sklearn 1.7 pickle loaded in 1.8)
+    if any(math.isnan(p) or math.isinf(p) for p in raw_prob):
+        logger.warning(
+            f"Model returned invalid probabilities ({raw_prob}) for {name_a} vs {name_b}. "
+            "This usually means the saved model was trained with a different sklearn version. "
+            "Falling back to 50/50 — retrain the model to fix permanently."
+        )
+        raw_prob = [0.5, 0.5]
+
+    model_prob = raw_prob
 
     # Compute penalty
     penalty_score = compute_mismatch_penalty(weight_diff, height_diff, reach_diff)
