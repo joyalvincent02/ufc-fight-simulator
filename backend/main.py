@@ -253,8 +253,10 @@ def list_upcoming_events():
             else:
                 logger.warning(f"Event: {e['title']}, Could not parse date. event_date_value: {event_date_value}, scraped date: {e.get('date')}, date_text: {e.get('date_text')}")
 
-            # Event is ongoing if it has results OR if it's happening today/yesterday (might still be processing)
-            is_ongoing = has_results or is_recent
+            # Event is ongoing only if it's happening today or yesterday.
+            # has_results alone is not sufficient — a completed event always has results,
+            # so using it with OR would cause past events to appear as ongoing indefinitely.
+            is_ongoing = is_recent
 
             event_data = {
                 "id": event_id,
