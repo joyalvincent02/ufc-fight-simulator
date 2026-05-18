@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import MMA_Math from "../assets/mma_math.svg";
 import { getEvents, simulateEvent, getModelPerformance, getFighters } from "../services/api";
+import { formatVegasEventDate } from "../utils/dateUtils";
 import { 
   SportsKabaddiOutlined, 
   PsychologyOutlined, 
@@ -34,20 +35,16 @@ export default function HomePage() {
   });
   const [loadingPerformance, setLoadingPerformance] = useState(true);
 
-  const formatEventDate = (event: NextEvent | null) => {
+  const formatEventDate = (event: NextEvent | null): string | null => {
     if (!event) return null;
-    if (event.event_date_display) return event.event_date_display;
     if (event.event_date) {
-      const iso = event.event_date.includes("T")
-        ? event.event_date
-        : `${event.event_date}T12:00:00Z`;
-      return new Date(iso).toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
+      const datePart = event.event_date.includes("T")
+        ? event.event_date.split("T")[0]
+        : event.event_date;
+      return formatVegasEventDate(datePart);
     }
-    return null;
+    // Fallback: server-formatted Las Vegas date — may differ from user's local date
+    return event.event_date_display ?? null;
   };
 
   useEffect(() => {

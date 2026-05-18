@@ -8,6 +8,7 @@ import SportsMmaIcon from '@mui/icons-material/SportsMma';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import RadioButtonCheckedIcon from '@mui/icons-material/RadioButtonChecked';
+import { formatVegasEventDate } from "../utils/dateUtils";
 
 type Event = {
   id: string;
@@ -74,18 +75,13 @@ export default function EventsPage() {
               </span>
             )}
           </div>
-          {(event.event_date_display || event.event_date) && (
+          {(event.event_date || event.event_date_display) && (
             <span className="text-sm text-gray-600 dark:text-gray-400">
-              {event.event_date_display ??
-                new Date(
-                  event.event_date!.includes("T")
-                    ? event.event_date!
-                    : `${event.event_date}T12:00:00Z`
-                ).toLocaleDateString(undefined, {
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric",
-                })}
+              {event.event_date
+                ? formatVegasEventDate(event.event_date.includes("T")
+                    ? event.event_date.split("T")[0]
+                    : event.event_date)
+                : event.event_date_display}
             </span>
           )}
         </div>
