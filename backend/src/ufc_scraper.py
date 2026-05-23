@@ -116,7 +116,7 @@ class _SubprocessPlaywrightScraper:
         # #endregion
 
         if result.returncode != 0:
-            raise RuntimeError(f"Playwright subprocess error (rc={result.returncode}): {result.stderr[:400]}")
+            raise RuntimeError(f"Playwright subprocess error (rc={result.returncode}): {result.stderr}")
 
         try:
             data = json.loads(result.stdout)
