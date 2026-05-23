@@ -3,6 +3,13 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 export async function getEvents() {
   const res = await fetch(`${BASE_URL}/events`);
   if (!res.ok) throw new Error("Failed to load events");
+  const data = await res.json();
+  if (!Array.isArray(data)) throw new Error(data?.error || "Failed to load events");
+  return data;
+}
+
+export async function getEventCard(eventId: string): Promise<any> {
+  const res = await fetch(`${BASE_URL}/event-card/${eventId}`);
   return res.json();
 }
 

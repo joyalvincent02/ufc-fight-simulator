@@ -1,4 +1,9 @@
-import requests
+from curl_cffi import requests as curl_requests
+import subprocess
+import sys
+import json
+import time
+import threading
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 import logging
@@ -6,6 +11,91 @@ import logging
 logger = logging.getLogger(__name__)
 
 BASE_URL = "http://ufcstats.com"
+
+
+class _PlaywrightResponse:
+    """Minimal response wrapper so existing call sites work unchanged."""
+    def __init__(self, text: str, status_code: int = 200):
+        self.text = text
+        self.status_code = status_code
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise Exception(f"HTTP {self.status_code}")
+
+
+# Playwright script run in a fresh subprocess to bypass Python 3.13 Windows
+# asyncio limitation: asyncio.create_subprocess_exec() only works in the main
+# thread. A subprocess is its own main-thread process, so it has no restrictions.
+_PLAYWRIGHT_SCRIPT = """\
+import asyncio, sys, json
+from playwright.async_api import async_playwright
+
+async def _main():
+    url, timeout_ms = sys.argv[1], int(sys.argv[2])
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        ctx = await browser.new_context(user_agent=(
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        ))
+        page = await ctx.new_page()
+        resp = await page.goto(url, wait_until="networkidle", timeout=timeout_ms)
+        html = await page.content()
+        status = resp.status if resp else 200
+        sys.stdout.write(json.dumps({"html": html, "status": status}))
+        await browser.close()
+
+asyncio.run(_main())
+"""
+
+_cache_lock = threading.Lock()
+_html_cache: dict[str, tuple[str, int, float]] = {}  # url -> (html, status, ts)
+_CACHE_TTL = 300  # 5 minutes
+
+
+class _SubprocessPlaywrightScraper:
+    """
+    Fetches URLs via a fresh Python subprocess running Playwright.
+    Results are cached for 5 minutes to amortise the subprocess/browser cost.
+    """
+
+    def get(self, url: str, timeout: int = 30, **kwargs) -> _PlaywrightResponse:
+        with _cache_lock:
+            cached = _html_cache.get(url)
+            if cached:
+                html, status, ts = cached
+                if time.time() - ts < _CACHE_TTL:
+                    return _PlaywrightResponse(html, status)
+
+        try:
+            result = subprocess.run(
+                [sys.executable, "-c", _PLAYWRIGHT_SCRIPT, url, str(timeout * 1000)],
+                capture_output=True,
+                text=True,
+                timeout=timeout + 60,
+                encoding="utf-8",
+                errors="replace",
+            )
+        except subprocess.TimeoutExpired as e:
+            raise TimeoutError(f"Playwright subprocess timed out for {url}") from e
+
+        if result.returncode != 0:
+            raise RuntimeError(f"Playwright subprocess error (rc={result.returncode}): {result.stderr[:400]}")
+
+        try:
+            data = json.loads(result.stdout)
+            html, status = data["html"], data["status"]
+        except (json.JSONDecodeError, KeyError) as e:
+            raise RuntimeError(f"Unexpected subprocess output: {result.stdout[:200]}") from e
+
+        with _cache_lock:
+            _html_cache[url] = (html, status, time.time())
+        return _PlaywrightResponse(html, status)
+
+
+_scraper = _SubprocessPlaywrightScraper()
+
 
 def _parse_event_date(date_text: str | None):
     if not date_text:
@@ -21,7 +111,7 @@ def _parse_event_date(date_text: str | None):
 
 def get_upcoming_event_links():
     url = f"{BASE_URL}/statistics/events/upcoming"
-    response = requests.get(url, timeout=30)  # Only add timeout
+    response = _scraper.get(url, timeout=30)
     soup = BeautifulSoup(response.text, "html.parser")
 
     event_links = []
@@ -52,11 +142,7 @@ def get_completed_event_links(days_back=7):
         url = f"{BASE_URL}/statistics/events/completed?page=all"
         logger.info(f"Fetching completed events from: {url}")
         
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        
-        response = requests.get(url, headers=headers, timeout=30)
+        response = _scraper.get(url, timeout=30)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
 
@@ -122,7 +208,7 @@ def is_event_ongoing(event_url: str) -> bool:
     This is the most reliable indicator that fights have completed
     """
     try:
-        response = requests.get(event_url, timeout=10)
+        response = _scraper.get(event_url, timeout=10)
         soup = BeautifulSoup(response.text, "html.parser")
         
         fight_rows = soup.select("tbody.b-fight-details__table-body tr")
@@ -162,7 +248,7 @@ def check_event_completion_status(event_url: str) -> tuple[bool, bool, int]:
     - total_fights: Total number of fights on the card
     """
     try:
-        response = requests.get(event_url, timeout=10)
+        response = _scraper.get(event_url, timeout=10)
         soup = BeautifulSoup(response.text, "html.parser")
         
         fight_rows = soup.select("tbody.b-fight-details__table-body tr")
@@ -207,7 +293,7 @@ def check_event_completion_status(event_url: str) -> tuple[bool, bool, int]:
         return (False, False, 0)
 
 def get_fight_card(event_url: str):
-    response = requests.get(event_url, timeout=30)  # Only add timeout
+    response = _scraper.get(event_url, timeout=30)
     soup = BeautifulSoup(response.text, "html.parser")
 
     fight_rows = soup.select("tbody.b-fight-details__table-body tr")
@@ -237,7 +323,7 @@ def get_fight_results(event_url: str):
     """
     try:
         logger.info(f"Scraping results from: {event_url}")
-        response = requests.get(event_url)
+        response = _scraper.get(event_url)
         soup = BeautifulSoup(response.text, "html.parser")
 
         # UFCStats completed event pages have a different structure than upcoming ones
@@ -354,7 +440,7 @@ def get_winner_from_fight_details(fight_url: str, fighter_a: str, fighter_b: str
     This page usually has clearer win/loss indicators
     """
     try:
-        response = requests.get(fight_url)
+        response = _scraper.get(fight_url)
         soup = BeautifulSoup(response.text, "html.parser")
         
         # Look for result section

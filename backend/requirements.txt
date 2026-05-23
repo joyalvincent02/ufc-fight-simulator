@@ -4,6 +4,8 @@ gunicorn
 sqlalchemy
 aiohttp
 requests
+curl_cffi
+playwright
 beautifulsoup4
 python-multipart
 numpy

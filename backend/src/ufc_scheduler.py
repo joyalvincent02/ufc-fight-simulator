@@ -170,13 +170,17 @@ class UFCScheduler:
                         url_a = fight.get("url_a")
                         url_b = fight.get("url_b")
                         
-                        # Check if predictions already exist
+                        # Check if predictions already exist for this fight at this specific event
                         db = SessionLocal()
                         existing = db.query(ModelPrediction).filter(
-                            ModelPrediction.fighter_a == fighter_a,
-                            ModelPrediction.fighter_b == fighter_b
+                            (
+                                (ModelPrediction.fighter_a == fighter_a) & (ModelPrediction.fighter_b == fighter_b)
+                            ) | (
+                                (ModelPrediction.fighter_a == fighter_b) & (ModelPrediction.fighter_b == fighter_a)
+                            ),
+                            ModelPrediction.event == event_title,
                         ).first()
-                        
+
                         if existing:
                             db.close()
                             continue
@@ -224,7 +228,7 @@ class UFCScheduler:
                         
                         # Generate predictions for all three models
                         try:
-                            result = get_ensemble_prediction(fighter_a, fighter_b)
+                            result = get_ensemble_prediction(fighter_a, fighter_b, event=event_title, event_url=event_url)
                             if result and not result.get('error'):
                                 new_predictions += 3  # ML, Ensemble, Sim
                                 logger.info(f"Generated predictions for {fighter_a} vs {fighter_b}")
@@ -664,13 +668,17 @@ def job_check_new_events():
                     url_a = fight.get("url_a")
                     url_b = fight.get("url_b")
                     
-                    # Check if predictions already exist
+                    # Check if predictions already exist for this fight at this specific event
                     db = SessionLocal()
                     existing = db.query(ModelPrediction).filter(
-                        ModelPrediction.fighter_a == fighter_a,
-                        ModelPrediction.fighter_b == fighter_b
+                        (
+                            (ModelPrediction.fighter_a == fighter_a) & (ModelPrediction.fighter_b == fighter_b)
+                        ) | (
+                            (ModelPrediction.fighter_a == fighter_b) & (ModelPrediction.fighter_b == fighter_a)
+                        ),
+                        ModelPrediction.event == event_title,
                     ).first()
-                    
+
                     if existing:
                         db.close()
                         continue
@@ -720,19 +728,19 @@ def job_check_new_events():
                         predictions_created = 0
                         
                         # Generate ML prediction
-                        ml_result = get_ensemble_prediction(fighter_a, fighter_b, model_type="ml", log_to_db=True)
+                        ml_result = get_ensemble_prediction(fighter_a, fighter_b, model_type="ml", log_to_db=True, event=event_title, event_url=event_url)
                         if ml_result and not ml_result.get('error'):
                             predictions_created += 1
                             logger.info(f"Generated ML prediction for {fighter_a} vs {fighter_b}")
                         
-                        # Generate Ensemble prediction  
-                        ensemble_result = get_ensemble_prediction(fighter_a, fighter_b, model_type="ensemble", log_to_db=True)
+                        # Generate Ensemble prediction
+                        ensemble_result = get_ensemble_prediction(fighter_a, fighter_b, model_type="ensemble", log_to_db=True, event=event_title, event_url=event_url)
                         if ensemble_result and not ensemble_result.get('error'):
                             predictions_created += 1
                             logger.info(f"Generated Ensemble prediction for {fighter_a} vs {fighter_b}")
                         
                         # Generate Simulation prediction
-                        sim_result = get_ensemble_prediction(fighter_a, fighter_b, model_type="sim", log_to_db=True)
+                        sim_result = get_ensemble_prediction(fighter_a, fighter_b, model_type="sim", log_to_db=True, event=event_title, event_url=event_url)
                         if sim_result and not sim_result.get('error'):
                             predictions_created += 1
                             logger.info(f"Generated Simulation prediction for {fighter_a} vs {fighter_b}")
@@ -869,9 +877,10 @@ def job_check_completed_events():
                             fighter_b_raw = result['fighter_b']
                             winner_raw = result['winner']
                             
-                            # Find matching predictions in database
+                            # Find matching predictions: this event's predictions + any pre-migration NULL-event rows
                             predictions = db.query(ModelPrediction).filter(
-                                ModelPrediction.actual_winner.is_(None)
+                                ModelPrediction.actual_winner.is_(None),
+                                (ModelPrediction.event == event['title']) | ModelPrediction.event.is_(None),
                             ).all()
                             
                             fight_matched = False
@@ -1099,20 +1108,27 @@ def _regenerate_future_predictions(db):
         skipped_count = 0
         
         for prediction in pending_predictions:
-            # Check if this prediction is for a future event
-            fight_result = db.query(FightResult).filter(
-                or_(
-                    and_(
-                        FightResult.fighter_name == prediction.fighter_a,
-                        FightResult.opponent_name == prediction.fighter_b
-                    ),
-                    and_(
-                        FightResult.fighter_name == prediction.fighter_b,
-                        FightResult.opponent_name == prediction.fighter_a
-                    )
+            # Check if this prediction is for a future event.
+            # Scope the FightResult lookup to the prediction's event when known, so that
+            # a rematch prediction isn't incorrectly classified as "past" due to a previous
+            # fight result between the same pair.
+            pair_filter = or_(
+                and_(
+                    FightResult.fighter_name == prediction.fighter_a,
+                    FightResult.opponent_name == prediction.fighter_b
+                ),
+                and_(
+                    FightResult.fighter_name == prediction.fighter_b,
+                    FightResult.opponent_name == prediction.fighter_a
                 )
-            ).order_by(FightResult.id.desc()).first()
-            
+            )
+            fight_result_query = db.query(FightResult).filter(pair_filter)
+            if prediction.event:
+                fight_result_query = fight_result_query.filter(FightResult.event == prediction.event)
+            else:
+                fight_result_query = fight_result_query.order_by(FightResult.id.desc())
+            fight_result = fight_result_query.first()
+
             # If no fight_result, assume it's a future event (no results yet)
             # If fight_result exists, check if event_date is in the future
             is_future_event = True

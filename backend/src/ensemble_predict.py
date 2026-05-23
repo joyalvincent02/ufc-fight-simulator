@@ -3,7 +3,7 @@ from src.simulate_fight import simulate_fight
 from src.fight_model import calculate_exchange_probabilities
 from src.db import SessionLocal, Fighter, log_prediction
 
-def get_ensemble_prediction(fighter_a: str, fighter_b: str, model_type: str = "ensemble", sim_runs: int = 1000, log_to_db: bool = True):
+def get_ensemble_prediction(fighter_a: str, fighter_b: str, model_type: str = "ensemble", sim_runs: int = 1000, log_to_db: bool = True, event: str = None, event_url: str = None):
     """
     Get ensemble prediction for two fighters.
     
@@ -94,7 +94,9 @@ def get_ensemble_prediction(fighter_a: str, fighter_b: str, model_type: str = "e
             weight_diff=int(diffs.get("weight_diff")) if diffs.get("weight_diff") is not None and model_type != "sim" else None,
             height_diff=int(diffs.get("height_diff")) if diffs.get("height_diff") is not None and model_type != "sim" else None,
             reach_diff=int(diffs.get("reach_diff")) if diffs.get("reach_diff") is not None and model_type != "sim" else None,
-            age_diff=int(diffs.get("age_diff")) if diffs.get("age_diff") is not None and model_type != "sim" else None
+            age_diff=int(diffs.get("age_diff")) if diffs.get("age_diff") is not None and model_type != "sim" else None,
+            event=event,
+            event_url=event_url,
         )
 
     return {

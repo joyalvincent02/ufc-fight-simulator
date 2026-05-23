@@ -59,6 +59,8 @@ interface DetailedPerformance {
         penalty_score: number | null;
         timestamp: string | null;
         has_result: boolean;
+        event: string | null;
+        event_date: string | null;
     }>;
     total_count: number;
 }

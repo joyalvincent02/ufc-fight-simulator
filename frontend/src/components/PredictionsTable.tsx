@@ -14,6 +14,52 @@ interface Prediction {
     penalty_score: number | null;
     timestamp: string | null;
     has_result: boolean;
+    event: string | null;
+    event_date: string | null;
+}
+
+const ROMAN = ['', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+
+function canonicalPair(p: Prediction): string {
+    return [p.fighter_a, p.fighter_b].sort().join('|');
+}
+
+function buildBoutIndex(predictions: Prediction[]): Map<string, number> {
+    // For each canonical pair, collect unique events ordered by event_date (or timestamp as fallback)
+    const pairEvents = new Map<string, string[]>();
+    for (const p of predictions) {
+        if (!p.event) continue;
+        const key = canonicalPair(p);
+        if (!pairEvents.has(key)) pairEvents.set(key, []);
+        if (!pairEvents.get(key)!.includes(p.event)) {
+            pairEvents.get(key)!.push(p.event);
+        }
+    }
+    // Sort each pair's events chronologically using event_date
+    const eventDateMap = new Map<string, string>();
+    for (const p of predictions) {
+        if (p.event && p.event_date && !eventDateMap.has(p.event)) {
+            eventDateMap.set(p.event, p.event_date);
+        }
+    }
+    for (const events of pairEvents.values()) {
+        events.sort((a, b) => {
+            const da = eventDateMap.get(a) || '';
+            const db_ = eventDateMap.get(b) || '';
+            return da.localeCompare(db_);
+        });
+    }
+    // Build a map from prediction id → roman numeral index (0 = no suffix)
+    const result = new Map<string, number>();
+    for (const p of predictions) {
+        if (!p.event) {
+            result.set(String(p.id), 0);
+            continue;
+        }
+        const events = pairEvents.get(canonicalPair(p)) || [];
+        result.set(String(p.id), events.indexOf(p.event));
+    }
+    return result;
 }
 
 interface PredictionsTableProps {
@@ -21,6 +67,7 @@ interface PredictionsTableProps {
 }
 
 export default function PredictionsTable({ predictions }: PredictionsTableProps) {
+    const boutIndex = buildBoutIndex(predictions);
     const [filter, setFilter] = useState<'all' | 'with_results' | 'pending'>('all');
     const [modelFilter, setModelFilter] = useState<'all' | 'ml' | 'ensemble' | 'sim'>('all');
     const [searchTerm, setSearchTerm] = useState('');
@@ -265,6 +312,10 @@ export default function PredictionsTable({ predictions }: PredictionsTableProps)
                                 <td className="p-4">
                                     <div className="text-sm font-medium text-gray-900 dark:text-white">
                                         {prediction.fighter_a} vs {prediction.fighter_b}
+                                        {(() => {
+                                            const idx = boutIndex.get(String(prediction.id)) ?? 0;
+                                            return idx > 0 ? <span className="ml-1 text-gray-500 dark:text-gray-400">{ROMAN[idx]}</span> : null;
+                                        })()}
                                     </div>
                                 </td>
                                 <td className="p-4">
@@ -315,6 +366,10 @@ export default function PredictionsTable({ predictions }: PredictionsTableProps)
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
                             <h3 className="font-medium text-gray-900 dark:text-white text-sm">
                                 {prediction.fighter_a} vs {prediction.fighter_b}
+                                {(() => {
+                                    const idx = boutIndex.get(String(prediction.id)) ?? 0;
+                                    return idx > 0 ? <span className="ml-1 text-gray-500 dark:text-gray-400">{ROMAN[idx]}</span> : null;
+                                })()}
                             </h3>
                             <div className="flex items-center gap-2">
                                 <span className={`px-2 py-1 rounded-lg text-xs font-medium border ${getModelBadge(prediction.model)}`}>

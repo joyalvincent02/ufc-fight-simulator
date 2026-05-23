@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import MMA_Math from "../assets/mma_math.svg";
-import { getEvents, simulateEvent, getModelPerformance, getFighters } from "../services/api";
+import { getEvents, getEventCard, getModelPerformance, getFighters } from "../services/api";
 import { formatVegasEventDate } from "../utils/dateUtils";
 import { 
   SportsKabaddiOutlined, 
@@ -55,11 +55,11 @@ export default function HomePage() {
       const selectedEvent = events.find((e: NextEvent) => e.status === "ongoing") || events[0];
       setNextEvent(selectedEvent);
 
-      simulateEvent(selectedEvent.id)
+      getEventCard(selectedEvent.id)
         .then((data) => {
           if (data.fights && data.fights.length > 0) {
             setMainEvent({
-              name: data.event,
+              name: selectedEvent.name,
               fighters: data.fights[0].fighters,
             });
           }
@@ -207,7 +207,7 @@ export default function HomePage() {
             ) : mainEvent ? (
               <>
                 <h2 className="text-2xl font-bold mb-4 text-red-500 dark:text-red-400">
-                  {nextEvent?.status === "ongoing" ? "Ongoing Event" : "Next Event"}
+                  {nextEvent?.status === "ongoing" ? "Today's Event" : "Next Event"}
                 </h2>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">{mainEvent.name}</h2>
                 {nextEventDateDisplay && (

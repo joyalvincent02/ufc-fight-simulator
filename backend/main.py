@@ -4,16 +4,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from src.fight_model import calculate_exchange_probabilities
 from src.simulate_fight import simulate_fight
-from src.ufc_scraper import get_upcoming_event_links, get_completed_event_links, get_fight_card, is_event_ongoing
+from src.ufc_scraper import get_upcoming_event_links, get_completed_event_links, get_fight_card, _scraper as _ufc_scraper
 from src.fighter_scraper import scrape_fighter_stats, save_fighter_to_db
 from src.db import SessionLocal, Fighter, ModelPrediction, FightResult
 from src.ensemble_predict import get_ensemble_prediction
 from src.ufc_scheduler import start_scheduler, stop_scheduler, get_scheduler
 import math
+import time
+from zoneinfo import ZoneInfo
 from types import SimpleNamespace
 from bs4 import BeautifulSoup
 from sqlalchemy import func, or_, and_
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 import requests
 import re
 import json
@@ -27,7 +29,25 @@ load_dotenv()
 # Configure logging
 logger = logging.getLogger(__name__)
 
-def to_stats_obj(d):
+# ---------------------------------------------------------------------------
+# Simple in-memory TTL cache
+# ---------------------------------------------------------------------------
+_cache: dict[str, tuple[float, any]] = {}
+
+def _cache_get(key: str, ttl: int):
+    """Return cached value if it exists and hasn't expired, else None."""
+    entry = _cache.get(key)
+    if entry and (time.time() - entry[0]) < ttl:
+        return entry[1]
+    return None
+
+def _cache_set(key: str, value):
+    _cache[key] = (time.time(), value)
+
+def _today_vegas() -> date:
+    """Return today's date in Las Vegas time (America/Los_Angeles)."""
+    return datetime.now(ZoneInfo("America/Los_Angeles")).date()
+
     return SimpleNamespace(**d)
 
 app = FastAPI()
@@ -172,6 +192,10 @@ def simulate_event(event_id: str):
 
 @app.get("/events")
 def list_upcoming_events():
+    cached = _cache_get("events", ttl=300)
+    if cached is not None:
+        return cached
+
     db = SessionLocal()
     try:
         # Get events from both upcoming and completed pages (for today's events)
@@ -191,7 +215,6 @@ def list_upcoming_events():
         for e in raw_events:
             event_id = e["url"].split("/")[-1]
             event_url = e["url"]
-            has_results = is_event_ongoing(event_url)
 
             event_date = (
                 db.query(FightResult.event_date)
@@ -241,22 +264,14 @@ def list_upcoming_events():
             else:
                 display_date_str = None
 
-            # Check if event is happening today or yesterday (even if no results yet)
-            # Events from yesterday might still be processing results
-            is_recent = False
-            today = date.today()
-            yesterday = today - timedelta(days=1)
+            # An event is "ongoing" for the entire calendar day it's scheduled,
+            # measured in Las Vegas time (where UFC events are based).
+            is_ongoing = False
+            today = _today_vegas()
             if event_date_obj_for_comparison:
-                is_today = event_date_obj_for_comparison == today
-                is_yesterday = event_date_obj_for_comparison == yesterday
-                is_recent = is_today or is_yesterday
+                is_ongoing = event_date_obj_for_comparison == today
             else:
                 logger.warning(f"Event: {e['title']}, Could not parse date. event_date_value: {event_date_value}, scraped date: {e.get('date')}, date_text: {e.get('date_text')}")
-
-            # Event is ongoing only if it's happening today or yesterday.
-            # has_results alone is not sufficient — a completed event always has results,
-            # so using it with OR would cause past events to appear as ongoing indefinitely.
-            is_ongoing = is_recent
 
             event_data = {
                 "id": event_id,
@@ -272,17 +287,54 @@ def list_upcoming_events():
             else:
                 upcoming_events.append(event_data)
 
-        return ongoing_events + upcoming_events
+        result = ongoing_events + upcoming_events
+        _cache_set("events", result)
+        return result
     except Exception as e:
+        logger.exception("Error in list_upcoming_events")
         return {"error": str(e)}
     finally:
         db.close()
+
+@app.get("/event-card/{event_id}")
+def get_event_card(event_id: str):
+    """Return the fight card (fighter names + images) without running any simulation."""
+    cache_key = f"event-card:{event_id}"
+    cached = _cache_get(cache_key, ttl=600)
+    if cached is not None:
+        return cached
+
+    event_url = f"http://ufcstats.com/event-details/{event_id}"
+    card = get_fight_card(event_url)
+    if not card:
+        return {"error": f"No fight card found for event {event_id}"}
+
+    db = SessionLocal()
+    try:
+        fights = []
+        for fight in card:
+            name_a = fight["fighter_a"]
+            name_b = fight["fighter_b"]
+            f1 = db.query(Fighter).filter(Fighter.name == name_a).first()
+            f2 = db.query(Fighter).filter(Fighter.name == name_b).first()
+            fights.append({
+                "fighters": [
+                    {"name": name_a, "image": f1.image_url if f1 else None},
+                    {"name": name_b, "image": f2.image_url if f2 else None},
+                ]
+            })
+        result = {"event_id": event_id, "fights": fights}
+        _cache_set(cache_key, result)
+        return result
+    finally:
+        db.close()
+
 
 @app.get("/simulate-event/{event_id}")
 def simulate_full_event(event_id: str, model: str = Query("ensemble", enum=["sim", "ml", "ensemble"])):
     event_url = f"http://ufcstats.com/event-details/{event_id}"
     try:
-        response = requests.get(event_url)
+        response = _ufc_scraper.get(event_url)
         soup = BeautifulSoup(response.text, "html.parser")
         title_tag = soup.find("h2", class_="b-content__title")
         event_title = title_tag.get_text(strip=True) if title_tag else f"Event ID {event_id}"
@@ -536,7 +588,23 @@ def get_detailed_performance():
 
         detailed_results = []
         for pred in predictions:
-            event_info = _get_prediction_event_info(db, pred.fighter_a, pred.fighter_b)
+            # Use the event stored on the prediction directly (set for all new predictions).
+            # For pre-migration rows (event is None), fall back to the FightResult lookup.
+            if pred.event:
+                date_row = (
+                    db.query(FightResult.event_date)
+                    .filter(
+                        FightResult.event == pred.event,
+                        FightResult.event_date.isnot(None),
+                    )
+                    .first()
+                )
+                event_info = {
+                    "event": pred.event,
+                    "event_date": date_row.event_date if date_row else None,
+                }
+            else:
+                event_info = _get_prediction_event_info(db, pred.fighter_a, pred.fighter_b)
             detailed_results.append({
                 "id": pred.id,
                 "fighter_a": pred.fighter_a,
@@ -607,12 +675,70 @@ def update_fight_result(
 # Scheduler startup and shutdown events
 @app.on_event("startup")
 async def startup_event():
-    """Start the UFC scheduler when the app starts"""
+    """Start the UFC scheduler when the app starts, then warm the homepage caches."""
     try:
         start_scheduler()
         print("UFC Scheduler started")
     except Exception as e:
         print(f"Failed to start scheduler: {e}")
+
+    import threading
+    def _warm_cache():
+        try:
+            print("Cache warm-up: fetching event list …")
+            from src.ufc_scraper import get_upcoming_event_links, get_completed_event_links
+            today = date.today()
+            yesterday = today - timedelta(days=1)
+
+            upcoming = get_upcoming_event_links()
+            recent = get_completed_event_links(days_back=3)
+            all_events = {e["url"]: e for e in recent}
+            for e in upcoming:
+                all_events.setdefault(e["url"], e)
+
+            # Mirror the same logic used in /events — ongoing = event is today (Vegas time)
+            today_wu = _today_vegas()
+
+            candidate = None
+            for e in all_events.values():
+                event_date = e.get("date")
+                if isinstance(event_date, datetime) and event_date.date() == today_wu:
+                    candidate = e
+                    break
+            if not candidate and upcoming:
+                candidate = upcoming[0]
+            if not candidate:
+                print("Cache warm-up: no events found")
+                return
+
+            event_id = candidate["url"].split("/")[-1]
+            cache_key = f"event-card:{event_id}"
+            if _cache_get(cache_key, ttl=600) is not None:
+                print(f"Cache warm-up: {event_id} already cached")
+                return
+
+            print(f"Cache warm-up: fetching fight card for {event_id} …")
+            card = get_fight_card(f"http://ufcstats.com/event-details/{event_id}")
+            if card:
+                db = SessionLocal()
+                try:
+                    fights = []
+                    for fight in card:
+                        name_a, name_b = fight["fighter_a"], fight["fighter_b"]
+                        f1 = db.query(Fighter).filter(Fighter.name == name_a).first()
+                        f2 = db.query(Fighter).filter(Fighter.name == name_b).first()
+                        fights.append({"fighters": [
+                            {"name": name_a, "image": f1.image_url if f1 else None},
+                            {"name": name_b, "image": f2.image_url if f2 else None},
+                        ]})
+                    _cache_set(cache_key, {"event_id": event_id, "fights": fights})
+                    print(f"Cache warm-up: fight card cached for {event_id}")
+                finally:
+                    db.close()
+        except Exception as e:
+            print(f"Cache warm-up failed: {e}")
+
+    threading.Thread(target=_warm_cache, daemon=True).start()
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -742,7 +868,7 @@ if os.getenv("ENVIRONMENT", "production").lower() != "production":
         """Debug endpoint to examine the HTML structure of an event page"""
         try:
             event_url = f"http://ufcstats.com/event-details/{event_id}"
-            response = requests.get(event_url)
+            response = _ufc_scraper.get(event_url)
             soup = BeautifulSoup(response.text, "html.parser")
             
             # Get basic event info

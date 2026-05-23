@@ -121,12 +121,19 @@ def save_outcomes(db: Session, outcomes):
             else:
                 actual_winner = "Draw"
             
-            # Update any matching predictions
-            predictions = db.query(ModelPrediction).filter(
+            # Update matching predictions scoped to this specific event.
+            # NULL-event rows are pre-migration records still eligible for resolution.
+            # The actual_winner.is_(None) guard prevents overwriting already-resolved predictions.
+            pair_filter = (
                 ((ModelPrediction.fighter_a == fighter_name) & (ModelPrediction.fighter_b == fight["opponent_name"])) |
                 ((ModelPrediction.fighter_a == fight["opponent_name"]) & (ModelPrediction.fighter_b == fighter_name))
+            )
+            predictions = db.query(ModelPrediction).filter(
+                pair_filter,
+                (ModelPrediction.event == fight["event"]) | ModelPrediction.event.is_(None),
+                ModelPrediction.actual_winner.is_(None),
             ).all()
-            
+
             for pred in predictions:
                 pred.actual_winner = actual_winner
                 pred.correct = (pred.predicted_winner == actual_winner)

@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, String, Float, DateTime, Integer, Date, Boolean, func
+from sqlalchemy import create_engine, Column, String, Float, DateTime, Integer, Date, Boolean, func, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from datetime import datetime, date
@@ -65,6 +65,8 @@ class ModelPrediction(Base):
     reach_diff = Column(Integer, nullable=True)
     age_diff = Column(Integer, nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow)
+    event = Column(String, nullable=True)
+    event_url = Column(String, nullable=True)
 
 
 class FightResult(Base):
@@ -93,6 +95,22 @@ class SchedulerMetadata(Base):
 Base.metadata.create_all(bind=engine)
 
 
+def run_migrations(eng=None):
+    """Idempotent startup migration — adds new columns to existing tables."""
+    target = eng or engine
+    with target.connect() as conn:
+        conn.execute(text(
+            "ALTER TABLE model_predictions ADD COLUMN IF NOT EXISTS event VARCHAR"
+        ))
+        conn.execute(text(
+            "ALTER TABLE model_predictions ADD COLUMN IF NOT EXISTS event_url VARCHAR"
+        ))
+        conn.commit()
+
+
+run_migrations()
+
+
 def log_prediction(
     fighter_a: str,
     fighter_b: str,
@@ -106,21 +124,49 @@ def log_prediction(
     height_diff: int = None,
     reach_diff: int = None,
     age_diff: int = None,
-    allow_duplicates: bool = False
+    allow_duplicates: bool = False,
+    event: str = None,
+    event_url: str = None,
 ):
     """Log a model prediction to the database with duplicate prevention"""
     db = SessionLocal()
     try:
         # Check for existing prediction unless duplicates are explicitly allowed
         if not allow_duplicates:
-            existing = db.query(ModelPrediction).filter(
-                ((ModelPrediction.fighter_a == fighter_a) & (ModelPrediction.fighter_b == fighter_b) & (ModelPrediction.model == model)) |
-                ((ModelPrediction.fighter_a == fighter_b) & (ModelPrediction.fighter_b == fighter_a) & (ModelPrediction.model == model))
-            ).first()
-            
-            if existing:
-                print(f"Prediction already exists for {fighter_a} vs {fighter_b} ({model}), skipping...")
-                return existing.id
+            # Base filter: same pair (either order) and same model
+            pair_and_model = (
+                ((ModelPrediction.fighter_a == fighter_a) & (ModelPrediction.fighter_b == fighter_b)) |
+                ((ModelPrediction.fighter_a == fighter_b) & (ModelPrediction.fighter_b == fighter_a))
+            ) & (ModelPrediction.model == model)
+
+            if event:
+                # Pass 1: exact event match → true duplicate, skip
+                existing_exact = db.query(ModelPrediction).filter(
+                    pair_and_model & (ModelPrediction.event == event)
+                ).first()
+                if existing_exact:
+                    print(f"Prediction already exists for {fighter_a} vs {fighter_b} ({model}) at {event}, skipping...")
+                    return existing_exact.id
+
+                # Pass 2: unresolved NULL-event prediction for the same pair/model
+                # This is a pre-migration record for this upcoming fight — backfill in place
+                stale = db.query(ModelPrediction).filter(
+                    pair_and_model &
+                    ModelPrediction.event.is_(None) &
+                    ModelPrediction.actual_winner.is_(None)
+                ).first()
+                if stale:
+                    stale.event = event
+                    stale.event_url = event_url
+                    db.commit()
+                    print(f"Backfilled event '{event}' onto existing prediction for {fighter_a} vs {fighter_b} ({model})")
+                    return stale.id
+            else:
+                # No event provided: fall back to original name+model check
+                existing = db.query(ModelPrediction).filter(pair_and_model).first()
+                if existing:
+                    print(f"Prediction already exists for {fighter_a} vs {fighter_b} ({model}), skipping...")
+                    return existing.id
         
         # Ensure all numeric values are native Python types (not numpy)
         def safe_convert_float(value):
@@ -146,7 +192,9 @@ def log_prediction(
             height_diff=safe_convert_int(height_diff),
             reach_diff=safe_convert_int(reach_diff),
             age_diff=safe_convert_int(age_diff),
-            timestamp=datetime.utcnow()
+            timestamp=datetime.utcnow(),
+            event=event,
+            event_url=event_url,
         )
         db.add(prediction)
         db.commit()
