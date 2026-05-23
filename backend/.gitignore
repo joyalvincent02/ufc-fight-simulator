@@ -25,12 +25,17 @@ data/*.db
 .env.production.local
 
 # Machine Learning models and data
-*.pkl
+# src/ml/fight_predictor.pkl and data/training_dataset.csv ARE intentionally
+# tracked - they provide a baseline for first-deploy / fallback if retraining
+# fails.  All other large ML artefacts are excluded.
 *.joblib
 *.h5
 *.hdf5
 models/
-data/training_dataset.csv
+# Exclude experimental / temp models but keep the production one
+**/temp_model.*
+**/backup_model.*
+**/experimental_*.pkl
 
 # Jupyter notebooks checkpoints
 .ipynb_checkpoints/
@@ -71,3 +76,10 @@ deployment/
 
 # APScheduler job store
 scheduled_jobs
+
+# CI-generated deployment venv (created by GitHub Actions, not for commit)
+antenv/
+
+# Playwright browser binaries installed at runtime (not for commit)
+.playwright_browsers/
+playwright-browsers/

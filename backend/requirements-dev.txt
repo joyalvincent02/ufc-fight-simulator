@@ -1,0 +1,22 @@
+# ============================================================
+# MMA Math Backend - Development / Local Requirements
+# ============================================================
+# Install with: pip install -r requirements-dev.txt
+# This includes everything in requirements.txt plus tools
+# only needed for local development, testing, and data work.
+# Do NOT use this file for Azure deployments.
+# ============================================================
+
+-r requirements.txt
+
+# --- Testing ---
+pytest>=8.0,<9.0
+httpx>=0.27,<1.0
+anyio>=4.0,<5.0
+
+# --- Notebooks ---
+jupyter>=1.0
+ipykernel>=6.0
+
+# --- Type stubs ---
+types-requests>=2.32,<3.0

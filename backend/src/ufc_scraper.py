@@ -1,4 +1,3 @@
-from curl_cffi import requests as curl_requests
 import subprocess
 import sys
 import json

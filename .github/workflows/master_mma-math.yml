@@ -22,11 +22,26 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
+      # Validate requirements install cleanly in CI before pushing to Azure.
+      # Key change: xgboost-cpu removes the nvidia-nccl-cu12 transitive
+      # dependency (~190 MB), which was the primary cause of Oryx hanging
+      # at the "Using zstd for compression" step.
+      - name: Validate Python dependencies
         run: |
           cd backend
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          echo "Installed packages:"
+          pip list --format=columns | grep -E "xgboost|nvidia|scikit|playwright|fastapi"
+
+      # Verify no nvidia GPU packages snuck back in via transitive deps
+      - name: Check for unexpected GPU packages
+        run: |
+          if pip list | grep -i "nvidia-nccl"; then
+            echo "ERROR: nvidia-nccl found in dependencies. Check requirements.txt."
+            exit 1
+          fi
+          echo "OK: no nvidia-nccl dependency detected"
 
       - name: Log in to Azure
         uses: azure/login@v2
@@ -35,25 +50,31 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_2F8A1310B367419385F24588B9057006 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_F413CA3A69F448D39E96A4F5899CBC3F }}
 
+      # Deploy source code.  Azure Oryx will install requirements.txt.
+      # With xgboost-cpu (~5 MB vs xgboost + nvidia-nccl-cu12 ~200 MB),
+      # the Oryx build phase is dramatically shorter.
+      # IMPORTANT: ensure SCM_DO_BUILD_DURING_DEPLOYMENT=true in App Settings
+      # (Azure default) so Oryx runs pip install from requirements.txt.
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'mma-math'
           slot-name: 'Production'
           package: ./backend
-          startup-command: 'gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app'
+          startup-command: 'bash startup.sh'
 
       - name: Wait for app to start
         run: |
           echo "Waiting for app to become healthy (up to 5 minutes)..."
-          for i in {1..30}; do
+          echo "Note: first cold start installs Playwright Chromium (~60 s extra)"
+          for i in {1..36}; do
             status=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.AZURE_APP_URL }}/health" || echo "000")
-            echo "Attempt $i/30: HTTP $status"
+            echo "Attempt $i/36: HTTP $status"
             if [ "$status" = "200" ]; then
               echo "App is healthy"
               break
             fi
-            if [ "$i" = "30" ]; then
+            if [ "$i" = "36" ]; then
               echo "Warning: app did not become healthy in time, proceeding anyway"
             fi
             sleep 10
