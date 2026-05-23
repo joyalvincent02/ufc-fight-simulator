@@ -15,6 +15,8 @@ export PLAYWRIGHT_BROWSERS_PATH
 CHROMIUM_MARKER="$PLAYWRIGHT_BROWSERS_PATH/.installed"
 
 if [ ! -f "$CHROMIUM_MARKER" ]; then
+    echo "[startup] Installing Playwright system dependencies..."
+    playwright install-deps chromium
     echo "[startup] Installing Playwright Chromium (browsers path: $PLAYWRIGHT_BROWSERS_PATH)..."
     playwright install chromium
     touch "$CHROMIUM_MARKER"

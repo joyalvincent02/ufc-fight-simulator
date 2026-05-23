@@ -3,30 +3,11 @@ import sys
 import json
 import time
 import threading
-import os
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 import logging
 
 logger = logging.getLogger(__name__)
-
-# #region agent log - debug helpers
-import pathlib as _pathlib
-
-def _dbg(msg: str, data: dict, hypothesis_id: str = ""):
-    import time as _t
-    entry = json.dumps({
-        "sessionId": "e3708c",
-        "hypothesisId": hypothesis_id,
-        "timestamp": int(_t.time() * 1000),
-        "location": "ufc_scraper.py",
-        "message": msg,
-        "data": data,
-    })
-    log_path = _pathlib.Path(__file__).parents[2] / "debug-e3708c.log"
-    with open(log_path, "a", encoding="utf-8") as _f:
-        _f.write(entry + "\n")
-# #endregion
 
 BASE_URL = "http://ufcstats.com"
 
@@ -86,14 +67,6 @@ class _SubprocessPlaywrightScraper:
                 if time.time() - ts < _CACHE_TTL:
                     return _PlaywrightResponse(html, status)
 
-        # #region agent log - hypothesis C: check PLAYWRIGHT_BROWSERS_PATH in env
-        _dbg("subprocess env check", {
-            "PLAYWRIGHT_BROWSERS_PATH": os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "NOT SET"),
-            "PATH": os.environ.get("PATH", "")[:300],
-            "url": url,
-        }, hypothesis_id="C")
-        # #endregion
-
         try:
             result = subprocess.run(
                 [sys.executable, "-c", _PLAYWRIGHT_SCRIPT, url, str(timeout * 1000)],
@@ -106,17 +79,8 @@ class _SubprocessPlaywrightScraper:
         except subprocess.TimeoutExpired as e:
             raise TimeoutError(f"Playwright subprocess timed out for {url}") from e
 
-        # #region agent log - hypotheses A/B/D/E: capture full stderr on failure
         if result.returncode != 0:
-            _dbg("subprocess failed", {
-                "returncode": result.returncode,
-                "stderr_full": result.stderr,
-                "stdout": result.stdout[:200],
-            }, hypothesis_id="A/B/D/E")
-        # #endregion
-
-        if result.returncode != 0:
-            raise RuntimeError(f"Playwright subprocess error (rc={result.returncode}): {result.stderr}")
+            raise RuntimeError(f"Playwright subprocess error (rc={result.returncode}): {result.stderr[:2000]}")
 
         try:
             data = json.loads(result.stdout)
