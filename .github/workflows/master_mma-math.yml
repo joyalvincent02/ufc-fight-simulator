@@ -83,7 +83,7 @@ jobs:
       - name: Retrain ML model with current package versions
         run: |
           echo "Triggering post-deploy model retrain (runs async on Azure, may take 5-10 min)..."
-          response=$(curl -s -w "\n%{http_code}" --max-time 600 -X POST "${{ secrets.AZURE_APP_URL }}/retrain-ml-model?min_new_results=0")
+          response=$(curl -s -w "\n%{http_code}" --max-time 600 -X POST -H "X-Admin-Key: ${{ secrets.ADMIN_SECRET }}" "${{ secrets.AZURE_APP_URL }}/retrain-ml-model?min_new_results=0")
           http_code=$(echo "$response" | tail -n1)
           body=$(echo "$response" | head -n -1)
           echo "Response ($http_code): $body"

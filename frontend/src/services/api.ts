@@ -1,5 +1,9 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
+function adminHeaders(key: string): Record<string, string> {
+  return { "Content-Type": "application/json", "X-Admin-Key": key };
+}
+
 export async function getEvents() {
   const res = await fetch(`${BASE_URL}/events`);
   if (!res.ok) throw new Error("Failed to load events");
@@ -47,10 +51,10 @@ export async function getDetailedPerformance() {
   return res.json();
 }
 
-export async function updateFightResult(fighterA: string, fighterB: string, actualWinner: string, event?: string) {
+export async function updateFightResult(fighterA: string, fighterB: string, actualWinner: string, adminKey: string, event?: string) {
   const res = await fetch(`${BASE_URL}/update-fight-result`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: adminHeaders(adminKey),
     body: JSON.stringify({ 
       fighter_a: fighterA, 
       fighter_b: fighterB, 
@@ -70,19 +74,19 @@ export async function getSchedulerStatus() {
   return res.json();
 }
 
-export async function manualResultCheck() {
+export async function manualResultCheck(adminKey: string) {
   const res = await fetch(`${BASE_URL}/scheduler/check-results`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: adminHeaders(adminKey),
   });
   if (!res.ok) throw new Error("Failed to trigger result check");
   return res.json();
 }
 
-export async function manualEventCheck() {
+export async function manualEventCheck(adminKey: string) {
   const res = await fetch(`${BASE_URL}/scheduler/check-events`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: adminHeaders(adminKey),
   });
   if (!res.ok) throw new Error("Failed to trigger event check");
   return res.json();

@@ -6,12 +6,15 @@ import SchedulerStatus from "../components/SchedulerStatus";
 import PageLayout from "../components/PageLayout";
 import Spinner from "../components/Spinner";
 import Tooltip from "../components/Tooltip";
+import { useAdminKey } from "../hooks/useAdminKey";
 import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import GpsFixedIcon from '@mui/icons-material/GpsFixed';
 import TableChartIcon from '@mui/icons-material/TableChart';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import LockOpenOutlinedIcon from '@mui/icons-material/LockOpenOutlined';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 
 interface ModelPerformance {
     overall_accuracy: number;
@@ -72,6 +75,10 @@ export default function ResultsPage() {
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
 
+    const { adminKey, setAdminKey, clearAdminKey } = useAdminKey();
+    const [keyInput, setKeyInput] = useState("");
+    const [showKeyInput, setShowKeyInput] = useState(false);
+
     const fetchData = async (showRefreshing = false) => {
         try {
             if (showRefreshing) setRefreshing(true);
@@ -99,6 +106,14 @@ export default function ResultsPage() {
 
     const handleRefresh = () => {
         fetchData(true);
+    };
+
+    const handleUnlock = () => {
+        if (keyInput.trim()) {
+            setAdminKey(keyInput.trim());
+            setKeyInput("");
+            setShowKeyInput(false);
+        }
     };
 
     if (loading) {
@@ -141,23 +156,67 @@ export default function ResultsPage() {
                             Track accuracy and performance of ML, Ensemble, and Simulation prediction models
                         </p>
                     </div>
-                    <button
-                        onClick={handleRefresh}
-                        disabled={refreshing}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 self-start sm:self-auto"
-                    >
-                        {refreshing ? (
-                            <>
-                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                Refreshing...
-                            </>
+                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                        {/* Subtle admin lock icon */}
+                        {adminKey ? (
+                            <button
+                                onClick={clearAdminKey}
+                                title="Lock admin"
+                                className="p-2 rounded-lg text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                            >
+                                <LockOpenOutlinedIcon sx={{ fontSize: 18 }} />
+                            </button>
                         ) : (
-                            <>
-                                <RefreshOutlinedIcon sx={{ fontSize: 20 }} />
-                                Refresh
-                            </>
+                            <div className="relative">
+                                <button
+                                    onClick={() => setShowKeyInput(v => !v)}
+                                    title="Admin"
+                                    className="p-2 rounded-lg text-gray-400 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-500 transition-colors"
+                                >
+                                    <LockOutlinedIcon sx={{ fontSize: 18 }} />
+                                </button>
+                                {showKeyInput && (
+                                    <div className="absolute right-0 top-full mt-1 z-10 bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-lg shadow-lg p-3 flex gap-2 w-72">
+                                        <input
+                                            autoFocus
+                                            type="password"
+                                            value={keyInput}
+                                            onChange={e => setKeyInput(e.target.value)}
+                                            onKeyDown={e => {
+                                                if (e.key === "Enter") handleUnlock();
+                                                if (e.key === "Escape") setShowKeyInput(false);
+                                            }}
+                                            placeholder="Admin key"
+                                            className="flex-1 px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-white/20 bg-white dark:bg-white/5 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                        <button
+                                            onClick={handleUnlock}
+                                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors"
+                                        >
+                                            OK
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         )}
-                    </button>
+                        <button
+                            onClick={handleRefresh}
+                            disabled={refreshing}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                            {refreshing ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    Refreshing...
+                                </>
+                            ) : (
+                                <>
+                                    <RefreshOutlinedIcon sx={{ fontSize: 20 }} />
+                                    Refresh
+                                </>
+                            )}
+                        </button>
+                    </div>
                 </div>
 
                 {/* Performance Stats */}
@@ -167,7 +226,7 @@ export default function ResultsPage() {
 
                 {/* Scheduler Status */}
                 <div className="mb-8">
-                    <SchedulerStatus />
+                    <SchedulerStatus adminKey={adminKey} />
                 </div>
 
                 {/* Model Performance Overview */}

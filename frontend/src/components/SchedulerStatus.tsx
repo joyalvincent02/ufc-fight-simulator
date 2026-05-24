@@ -17,12 +17,17 @@ interface SchedulerStatus {
     last_cleanup: string | null;
 }
 
-export default function SchedulerStatus() {
+interface SchedulerStatusProps {
+    adminKey: string;
+}
+
+export default function SchedulerStatus({ adminKey }: SchedulerStatusProps) {
     const [status, setStatus] = useState<SchedulerStatus | null>(null);
     const [loading, setLoading] = useState(true);
     const [checking, setChecking] = useState({ results: false, events: false });
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
+    const isLocked = !adminKey;
 
     useEffect(() => {
         fetchStatus();
@@ -127,7 +132,7 @@ export default function SchedulerStatus() {
         setMessage(null);
         
         try {
-            const result = await manualResultCheck();
+            const result = await manualResultCheck(adminKey);
             
             if (result.error) {
                 setMessage({ type: 'error', text: result.error });
@@ -168,7 +173,7 @@ export default function SchedulerStatus() {
         setMessage(null);
         
         try {
-            const result = await manualEventCheck();
+            const result = await manualEventCheck(adminKey);
             setMessage({ 
                 type: 'success', 
                 text: `${result.message || 'Event check completed successfully'}. Refreshing page data...` 
@@ -244,7 +249,8 @@ export default function SchedulerStatus() {
                                 e.stopPropagation();
                                 handleManualResultCheck();
                             }}
-                            disabled={checking.results}
+                            disabled={checking.results || isLocked}
+                            title={isLocked ? "Admin unlock required" : undefined}
                             className="px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:opacity-50 text-white rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center gap-2"
                         >
                             {checking.results && <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
@@ -255,7 +261,8 @@ export default function SchedulerStatus() {
                                 e.stopPropagation();
                                 handleManualEventCheck();
                             }}
-                            disabled={checking.events}
+                            disabled={checking.events || isLocked}
+                            title={isLocked ? "Admin unlock required" : undefined}
                             className="px-3 sm:px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-800 disabled:opacity-50 text-white rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center gap-2"
                         >
                             {checking.events && <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}

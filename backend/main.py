@@ -1,5 +1,5 @@
 # backend/main.py
-from fastapi import FastAPI, Query, Body
+from fastapi import FastAPI, Query, Body, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from src.fight_model import calculate_exchange_probabilities
@@ -20,6 +20,7 @@ import requests
 import re
 import json
 import os
+import secrets
 import traceback
 import logging
 from dotenv import load_dotenv
@@ -28,6 +29,18 @@ load_dotenv()
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Admin auth
+# ---------------------------------------------------------------------------
+ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
+
+def verify_admin_key(x_admin_key: str = Header(None)):
+    """Dependency that enforces the X-Admin-Key header on sensitive endpoints."""
+    if not ADMIN_SECRET:
+        raise HTTPException(status_code=500, detail="Admin secret not configured on the server")
+    if not x_admin_key or not secrets.compare_digest(x_admin_key, ADMIN_SECRET):
+        raise HTTPException(status_code=401, detail="Invalid or missing admin key")
 
 # ---------------------------------------------------------------------------
 # Simple in-memory TTL cache
@@ -473,7 +486,7 @@ def predict_from_ml(req: CustomSimRequest):
     return predict_fight_outcome(req.fighter_a, req.fighter_b)
 
 @app.post("/refresh-images")
-def refresh_fighter_images():
+def refresh_fighter_images(_: None = Depends(verify_admin_key)):
     db = SessionLocal()
     fighters = db.query(Fighter).all()
     updated = 0
@@ -636,17 +649,22 @@ def update_fight_result(
     fighter_a: str = Body(...),
     fighter_b: str = Body(...),
     actual_winner: str = Body(...),
-    event: str = Body(None)
+    event: str = Body(None),
+    _: None = Depends(verify_admin_key)
 ):
     """Update the actual result of a fight and mark predictions as correct/incorrect"""
     db = SessionLocal()
     
     try:
-        # Find matching predictions
-        predictions = db.query(ModelPrediction).filter(
+        # Find matching predictions, optionally scoped to a specific event (for rematches)
+        base_filter = (
             ((ModelPrediction.fighter_a == fighter_a) & (ModelPrediction.fighter_b == fighter_b)) |
             ((ModelPrediction.fighter_a == fighter_b) & (ModelPrediction.fighter_b == fighter_a))
-        ).all()
+        )
+        query = db.query(ModelPrediction).filter(base_filter)
+        if event:
+            query = query.filter(ModelPrediction.event == event)
+        predictions = query.all()
         
         updated_count = 0
         for pred in predictions:
@@ -760,7 +778,7 @@ def get_scheduler_status():
         return {"error": str(e)}
 
 @app.post("/scheduler/check-results")
-def manual_result_check():
+def manual_result_check(_: None = Depends(verify_admin_key)):
     """Manually trigger a check for completed events"""
     try:
         scheduler = get_scheduler()
@@ -769,7 +787,7 @@ def manual_result_check():
         return {"error": str(e)}
 
 @app.post("/scheduler/check-events")
-def manual_event_check():
+def manual_event_check(_: None = Depends(verify_admin_key)):
     """Manually trigger a check for new events"""
     try:
         scheduler = get_scheduler()
@@ -778,7 +796,7 @@ def manual_event_check():
         return {"error": str(e)}
 
 @app.post("/scheduler/cleanup-old-predictions")
-def manual_cleanup_old_predictions():
+def manual_cleanup_old_predictions(_: None = Depends(verify_admin_key)):
     """Manually trigger cleanup of stale pending predictions"""
     try:
         scheduler = get_scheduler()
@@ -787,7 +805,7 @@ def manual_cleanup_old_predictions():
         return {"error": str(e)}
 
 @app.post("/scheduler/pause")
-def pause_scheduler():
+def pause_scheduler(_: None = Depends(verify_admin_key)):
     """Pause the scheduler to stop automatic job execution"""
     try:
         scheduler = get_scheduler()
@@ -797,7 +815,7 @@ def pause_scheduler():
         return {"error": str(e)}
 
 @app.post("/scheduler/resume")
-def resume_scheduler():
+def resume_scheduler(_: None = Depends(verify_admin_key)):
     """Resume the scheduler to allow automatic job execution"""
     try:
         scheduler = get_scheduler()
@@ -807,7 +825,7 @@ def resume_scheduler():
         return {"error": str(e)}
 
 @app.post("/retrain-ml-model")
-def retrain_ml_model_endpoint(min_new_results: int = Query(5, description="Minimum new results required to trigger retraining")):
+def retrain_ml_model_endpoint(min_new_results: int = Query(5, description="Minimum new results required to trigger retraining"), _: None = Depends(verify_admin_key)):
     """Manual trigger to retrain the ML model with latest fight results"""
     try:
         scheduler = get_scheduler()
