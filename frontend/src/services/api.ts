@@ -67,6 +67,14 @@ export async function updateFightResult(fighterA: string, fighterB: string, actu
   return res.json();
 }
 
+export async function verifyAdminKey(key: string): Promise<boolean> {
+  const res = await fetch(`${BASE_URL}/admin/verify`, {
+    method: "POST",
+    headers: adminHeaders(key),
+  });
+  return res.ok;
+}
+
 // Scheduler API functions
 export async function getSchedulerStatus() {
   const res = await fetch(`${BASE_URL}/scheduler/status`);

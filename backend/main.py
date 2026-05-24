@@ -76,6 +76,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ---------------------------------------------------------------------------
+# Admin verify endpoint
+# ---------------------------------------------------------------------------
+@app.post("/admin/verify")
+def admin_verify(_: None = Depends(verify_admin_key)):
+    """Lightweight endpoint used by the frontend to validate an admin key."""
+    return {"ok": True}
+
 def name_to_slug(name: str) -> str:
     return name.lower().replace(" ", "-")
 

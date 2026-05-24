@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getModelPerformance, getDetailedPerformance } from "../services/api";
+import { getModelPerformance, getDetailedPerformance, verifyAdminKey } from "../services/api";
 import PerformanceStats from "../components/PerformanceStats";
 import PredictionsTable from "../components/PredictionsTable";
 import SchedulerStatus from "../components/SchedulerStatus";
@@ -78,6 +78,8 @@ export default function ResultsPage() {
     const { adminKey, setAdminKey, clearAdminKey } = useAdminKey();
     const [keyInput, setKeyInput] = useState("");
     const [showKeyInput, setShowKeyInput] = useState(false);
+    const [keyError, setKeyError] = useState(false);
+    const [verifying, setVerifying] = useState(false);
 
     const fetchData = async (showRefreshing = false) => {
         try {
@@ -108,11 +110,20 @@ export default function ResultsPage() {
         fetchData(true);
     };
 
-    const handleUnlock = () => {
-        if (keyInput.trim()) {
-            setAdminKey(keyInput.trim());
+    const handleUnlock = async () => {
+        const trimmed = keyInput.trim();
+        if (!trimmed) return;
+        setVerifying(true);
+        setKeyError(false);
+        const valid = await verifyAdminKey(trimmed);
+        setVerifying(false);
+        if (valid) {
+            setAdminKey(trimmed);
             setKeyInput("");
             setShowKeyInput(false);
+            setKeyError(false);
+        } else {
+            setKeyError(true);
         }
     };
 
@@ -169,32 +180,38 @@ export default function ResultsPage() {
                         ) : (
                             <div className="relative">
                                 <button
-                                    onClick={() => setShowKeyInput(v => !v)}
+                                    onClick={() => { setShowKeyInput(v => !v); setKeyError(false); }}
                                     title="Admin"
                                     className="p-2 rounded-lg text-gray-400 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-500 transition-colors"
                                 >
                                     <LockOutlinedIcon sx={{ fontSize: 18 }} />
                                 </button>
                                 {showKeyInput && (
-                                    <div className="absolute right-0 top-full mt-1 z-10 bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-lg shadow-lg p-3 flex gap-2 w-72">
+                                    <div className="absolute right-0 top-full mt-1 z-10 bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-lg shadow-lg p-3 flex flex-col gap-2 w-72">
+                                        <div className="flex gap-2">
                                         <input
                                             autoFocus
                                             type="password"
                                             value={keyInput}
-                                            onChange={e => setKeyInput(e.target.value)}
+                                            onChange={e => { setKeyInput(e.target.value); setKeyError(false); }}
                                             onKeyDown={e => {
                                                 if (e.key === "Enter") handleUnlock();
                                                 if (e.key === "Escape") setShowKeyInput(false);
                                             }}
                                             placeholder="Admin key"
-                                            className="flex-1 px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-white/20 bg-white dark:bg-white/5 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            className={`flex-1 px-3 py-1.5 text-sm rounded-md border bg-white dark:bg-white/5 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 ${keyError ? "border-red-500 focus:ring-red-500" : "border-gray-300 dark:border-white/20 focus:ring-blue-500"}`}
                                         />
                                         <button
                                             onClick={handleUnlock}
-                                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors"
+                                            disabled={verifying}
+                                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm rounded-md transition-colors"
                                         >
-                                            OK
+                                            {verifying ? "..." : "OK"}
                                         </button>
+                                        </div>
+                                        {keyError && (
+                                            <p className="text-xs text-red-500 dark:text-red-400">Invalid admin key</p>
+                                        )}
                                     </div>
                                 )}
                             </div>
