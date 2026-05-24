@@ -57,11 +57,12 @@ def _cache_get(key: str, ttl: int):
 def _cache_set(key: str, value):
     _cache[key] = (time.time(), value)
 
+def to_stats_obj(d):
+    return SimpleNamespace(**d)
+
 def _today_vegas() -> date:
     """Return today's date in Las Vegas time (America/Los_Angeles)."""
     return datetime.now(ZoneInfo("America/Los_Angeles")).date()
-
-    return SimpleNamespace(**d)
 
 app = FastAPI()
 

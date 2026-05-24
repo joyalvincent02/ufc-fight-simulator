@@ -115,15 +115,20 @@ export default function ResultsPage() {
         if (!trimmed) return;
         setVerifying(true);
         setKeyError(false);
-        const valid = await verifyAdminKey(trimmed);
-        setVerifying(false);
-        if (valid) {
-            setAdminKey(trimmed);
-            setKeyInput("");
-            setShowKeyInput(false);
-            setKeyError(false);
-        } else {
+        try {
+            const valid = await verifyAdminKey(trimmed);
+            if (valid) {
+                setAdminKey(trimmed);
+                setKeyInput("");
+                setShowKeyInput(false);
+                setKeyError(false);
+            } else {
+                setKeyError(true);
+            }
+        } catch {
             setKeyError(true);
+        } finally {
+            setVerifying(false);
         }
     };
 

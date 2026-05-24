@@ -12,10 +12,12 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR, EVENT_JOB_MISSED
+from sqlalchemy import and_, or_
 from src.db import (
     SessionLocal,
     ModelPrediction,
     Fighter,
+    FightResult,
     SchedulerMetadata,
     upsert_fight_result,
 )
