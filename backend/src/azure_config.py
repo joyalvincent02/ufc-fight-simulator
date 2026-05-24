@@ -8,8 +8,9 @@ from pathlib import Path
 def get_data_directory():
     """Get the appropriate data directory based on environment"""
     if is_azure_environment():
-        # Use Azure App Service's temporary directory
-        data_dir = "/tmp/data"
+        # /home is Azure App Service's persistent storage (backed by Azure Files).
+        # Unlike /tmp it survives container restarts, cold starts, and idle timeouts.
+        data_dir = "/home/data"
     else:
         # Local development
         data_dir = "data"
@@ -21,8 +22,8 @@ def get_data_directory():
 def get_model_path():
     """Get the ML model file path"""
     if is_azure_environment():
-        # Store in writable temp directory
-        return "/tmp/fight_predictor.pkl"
+        # Persist to /home so the trained model survives container restarts.
+        return "/home/fight_predictor.pkl"
     else:
         # Local development - use existing location
         return "src/ml/fight_predictor.pkl"

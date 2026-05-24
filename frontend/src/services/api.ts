@@ -99,3 +99,24 @@ export async function manualEventCheck(adminKey: string) {
   if (!res.ok) throw new Error("Failed to trigger event check");
   return res.json();
 }
+
+export async function retrainMlModel(adminKey: string, minNewResults: number = 0) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  try {
+    const res = await fetch(`${BASE_URL}/retrain-ml-model?min_new_results=${minNewResults}`, {
+      method: "POST",
+      headers: adminHeaders(adminKey),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return { status: "completed" as const, data: await res.json() };
+  } catch (err: any) {
+    if (err.name === "AbortError") {
+      return { status: "running" as const };
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+}

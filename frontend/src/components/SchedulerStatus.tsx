@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { getSchedulerStatus, manualResultCheck, manualEventCheck } from "../services/api";
+import { useState, useEffect, useRef } from "react";
+import { getSchedulerStatus, manualResultCheck, manualEventCheck, retrainMlModel } from "../services/api";
 
 interface Job {
     id: string;
@@ -15,6 +15,7 @@ interface SchedulerStatus {
     last_profile_update: string | null;
     last_result_check: string | null;
     last_cleanup: string | null;
+    last_ml_retrain: string | null;
 }
 
 interface SchedulerStatusProps {
@@ -24,16 +25,20 @@ interface SchedulerStatusProps {
 export default function SchedulerStatus({ adminKey }: SchedulerStatusProps) {
     const [status, setStatus] = useState<SchedulerStatus | null>(null);
     const [loading, setLoading] = useState(true);
-    const [checking, setChecking] = useState({ results: false, events: false });
+    const [checking, setChecking] = useState({ results: false, events: false, retrain: false });
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
     const isLocked = !adminKey;
+    const retrainPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     useEffect(() => {
         fetchStatus();
         // Refresh status every minute to show updated timestamps
         const interval = setInterval(fetchStatus, 60000);
-        return () => clearInterval(interval);
+        return () => {
+            clearInterval(interval);
+            if (retrainPollRef.current) clearInterval(retrainPollRef.current);
+        };
     }, []);
 
     const fetchStatus = async () => {
@@ -193,6 +198,52 @@ export default function SchedulerStatus({ adminKey }: SchedulerStatusProps) {
         }
     };
 
+    const handleRetrainModel = async () => {
+        setChecking(prev => ({ ...prev, retrain: true }));
+        setMessage(null);
+
+        try {
+            const result = await retrainMlModel(adminKey);
+
+            if (result.status === 'running') {
+                setMessage({
+                    type: 'success',
+                    text: 'Retrain started — this takes 5-15 minutes. Watch "Last ML Retrain" below for the updated timestamp when it finishes.',
+                });
+                // Cancel any existing poll before starting a new one
+                if (retrainPollRef.current) clearInterval(retrainPollRef.current);
+                // Poll status every 30s for up to 15 minutes, then stop
+                let polls = 0;
+                retrainPollRef.current = setInterval(async () => {
+                    polls++;
+                    await fetchStatus();
+                    if (polls >= 30) {
+                        clearInterval(retrainPollRef.current!);
+                        retrainPollRef.current = null;
+                    }
+                }, 30000);
+            } else {
+                const data = result.data;
+                if (data.retrained) {
+                    setMessage({
+                        type: 'success',
+                        text: `Model retrained on ${data.new_results_count} new results. CV accuracy: ${data.model_metrics?.cv_accuracy != null ? `${(data.model_metrics.cv_accuracy * 100).toFixed(1)}%` : 'N/A'}.`,
+                    });
+                    fetchStatus();
+                } else {
+                    setMessage({
+                        type: 'success',
+                        text: data.message || 'Retrain skipped (insufficient new data).',
+                    });
+                }
+            }
+        } catch (error) {
+            setMessage({ type: 'error', text: 'Failed to trigger model retrain.' });
+        } finally {
+            setChecking(prev => ({ ...prev, retrain: false }));
+        }
+    };
+
     if (loading) {
         return (
             <div className="bg-white/80 dark:bg-black/20 rounded-xl border border-gray-200 dark:border-white/10 p-6">
@@ -268,6 +319,18 @@ export default function SchedulerStatus({ adminKey }: SchedulerStatusProps) {
                             {checking.events && <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
                             <span>Check Events</span>
                         </button>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleRetrainModel();
+                            }}
+                            disabled={checking.retrain || isLocked}
+                            title={isLocked ? "Admin unlock required" : "Retrain ML model with latest fight results"}
+                            className="px-3 sm:px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-800 disabled:opacity-50 text-white rounded-lg text-xs sm:text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                        >
+                            {checking.retrain && <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+                            <span>{checking.retrain ? 'Retraining...' : 'Retrain Model'}</span>
+                        </button>
                     </div>
                 </div>
                 
@@ -335,6 +398,12 @@ export default function SchedulerStatus({ adminKey }: SchedulerStatusProps) {
                                 <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Database Cleanup</div>
                                 <div className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">
                                     {formatDateTime(status.last_cleanup)}
+                                </div>
+                            </div>
+                            <div className="p-3 sm:p-4 bg-white/90 dark:bg-white/5 rounded-lg sm:col-span-2">
+                                <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">ML Model Retrain</div>
+                                <div className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">
+                                    {formatDateTime(status.last_ml_retrain)}
                                 </div>
                             </div>
                         </div>

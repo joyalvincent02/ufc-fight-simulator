@@ -16,7 +16,7 @@ def load_model():
     global _model, _model_mtime
     model_path = get_model_path()
 
-    for path in [model_path, "src/ml/fight_predictor.pkl"]:
+    for path in [model_path, "/home/fight_predictor.pkl", "src/ml/fight_predictor.pkl"]:
         if os.path.exists(path):
             mtime = os.path.getmtime(path)
             if _model is None or mtime != _model_mtime:
