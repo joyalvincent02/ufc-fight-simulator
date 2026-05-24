@@ -14,7 +14,7 @@ import time
 from zoneinfo import ZoneInfo
 from types import SimpleNamespace
 from bs4 import BeautifulSoup
-from sqlalchemy import func, or_, and_
+from sqlalchemy import func, or_, and_, case
 from datetime import datetime, date, timedelta, timezone
 import requests
 import re
@@ -507,77 +507,111 @@ def refresh_fighter_images(_: None = Depends(verify_admin_key)):
 @app.get("/model-performance")
 def get_model_performance():
     """Get overall model performance statistics"""
+    cached = _cache_get("model-performance", ttl=60)
+    if cached is not None:
+        return cached
+
     db = SessionLocal()
     
     try:
-        # Get all predictions with their results
-        predictions = db.query(ModelPrediction).all()
-        
-        # Calculate overall stats
-        total_predictions = len(predictions)
-        predictions_with_results = [p for p in predictions if p.actual_winner is not None]
-        correct_predictions = [p for p in predictions_with_results if p.correct is True]
-        
-        overall_accuracy = (len(correct_predictions) / len(predictions_with_results) * 100) if predictions_with_results else 0
-        
-        # Get recent performance (last 10 completed predictions)
-        recent_predictions = [p for p in predictions_with_results][-10:] if predictions_with_results else []
-        recent_correct = [p for p in recent_predictions if p.correct is True]
-        recent_accuracy = (len(recent_correct) / len(recent_predictions) * 100) if recent_predictions else 0
-        
-        # Calculate average confidence (using highest probability from each prediction)
-        predictions_with_confidence = [
-            p for p in predictions
-            if p.fighter_a_prob is not None and p.fighter_b_prob is not None
-            and not math.isnan(p.fighter_a_prob) and not math.isnan(p.fighter_b_prob)
-        ]
-        if predictions_with_confidence:
-            total_confidence = sum(max(p.fighter_a_prob, p.fighter_b_prob) for p in predictions_with_confidence)
-            avg_confidence = total_confidence / len(predictions_with_confidence)
-        else:
-            avg_confidence = 0
-        if math.isnan(avg_confidence) or math.isinf(avg_confidence):
-            avg_confidence = 0
-        
-        # Break down by model
-        model_breakdown = {}
-        for model in ["ml", "ensemble", "sim"]:
-            model_predictions = [p for p in predictions if p.model == model]
-            model_with_results = [p for p in model_predictions if p.actual_winner is not None]
-            model_correct = [p for p in model_with_results if p.correct is True]
-            
-            model_breakdown[model] = {
-                "total": len(model_predictions),
-                "total_with_results": len(model_with_results),
-                "correct": len(model_correct),
-                "accuracy": round((len(model_correct) / len(model_with_results) * 100), 1) if model_with_results else 0
-            }
-        
-        # Find best performing model (after model_breakdown is calculated)
-        best_model = "ensemble"  # default
-        best_accuracy = 0
-        for model_name, stats in model_breakdown.items():
-            if stats["total_with_results"] >= 3 and stats["accuracy"] > best_accuracy:  # At least 3 results for meaningful comparison
-                best_model = model_name
-                best_accuracy = stats["accuracy"]
-        
         def safe_round(v, n=1):
-            if math.isnan(v) or math.isinf(v):
+            if v is None or math.isnan(v) or math.isinf(v):
                 return 0.0
             return round(v, n)
 
-        return {
+        # --- Aggregate counts via SQL (avoids loading every row into Python) ---
+        total_predictions = db.query(func.count(ModelPrediction.id)).scalar() or 0
+
+        predictions_with_results = (
+            db.query(func.count(ModelPrediction.id))
+            .filter(ModelPrediction.actual_winner.isnot(None))
+            .scalar() or 0
+        )
+
+        correct_predictions = (
+            db.query(func.count(ModelPrediction.id))
+            .filter(ModelPrediction.actual_winner.isnot(None), ModelPrediction.correct.is_(True))
+            .scalar() or 0
+        )
+
+        overall_accuracy = (correct_predictions / predictions_with_results * 100) if predictions_with_results else 0
+
+        # Recent performance: last 10 completed predictions ordered by timestamp
+        recent_rows = (
+            db.query(ModelPrediction.correct)
+            .filter(ModelPrediction.actual_winner.isnot(None))
+            .order_by(ModelPrediction.timestamp.desc())
+            .limit(10)
+            .all()
+        )
+        recent_predictions_count = len(recent_rows)
+        recent_correct = sum(1 for r in recent_rows if r.correct is True)
+        recent_accuracy = (recent_correct / recent_predictions_count * 100) if recent_predictions_count else 0
+
+        # Average confidence: compute in SQL
+        avg_confidence_row = (
+            db.query(
+                func.avg(
+                    case(
+                        (ModelPrediction.fighter_a_prob > ModelPrediction.fighter_b_prob, ModelPrediction.fighter_a_prob),
+                        else_=ModelPrediction.fighter_b_prob,
+                    )
+                )
+            )
+            .filter(
+                ModelPrediction.fighter_a_prob.isnot(None),
+                ModelPrediction.fighter_b_prob.isnot(None),
+            )
+            .scalar()
+        )
+        avg_confidence = safe_round(avg_confidence_row or 0)
+
+        # Per-model breakdown via SQL
+        model_breakdown = {}
+        for model_name in ["ml", "ensemble", "sim"]:
+            m_total = (
+                db.query(func.count(ModelPrediction.id))
+                .filter(ModelPrediction.model == model_name)
+                .scalar() or 0
+            )
+            m_with_results = (
+                db.query(func.count(ModelPrediction.id))
+                .filter(ModelPrediction.model == model_name, ModelPrediction.actual_winner.isnot(None))
+                .scalar() or 0
+            )
+            m_correct = (
+                db.query(func.count(ModelPrediction.id))
+                .filter(ModelPrediction.model == model_name, ModelPrediction.actual_winner.isnot(None), ModelPrediction.correct.is_(True))
+                .scalar() or 0
+            )
+            model_breakdown[model_name] = {
+                "total": m_total,
+                "total_with_results": m_with_results,
+                "correct": m_correct,
+                "accuracy": round((m_correct / m_with_results * 100), 1) if m_with_results else 0,
+            }
+
+        best_model = "ensemble"
+        best_accuracy = 0.0
+        for model_name, stats in model_breakdown.items():
+            if stats["total_with_results"] >= 3 and stats["accuracy"] > best_accuracy:
+                best_model = model_name
+                best_accuracy = stats["accuracy"]
+
+        result = {
             "overall_accuracy": safe_round(overall_accuracy),
             "total_predictions": total_predictions,
-            "predictions_with_results": len(predictions_with_results),
-            "correct_predictions": len(correct_predictions),
+            "predictions_with_results": predictions_with_results,
+            "correct_predictions": correct_predictions,
             "recent_accuracy": safe_round(recent_accuracy),
-            "recent_predictions_count": len(recent_predictions),
+            "recent_predictions_count": recent_predictions_count,
             "best_model": best_model,
             "best_model_accuracy": safe_round(best_accuracy),
-            "avg_confidence": safe_round(avg_confidence),
-            "model_breakdown": model_breakdown
+            "avg_confidence": avg_confidence,
+            "model_breakdown": model_breakdown,
         }
+        _cache_set("model-performance", result)
+        return result
     
     finally:
         db.close()
@@ -586,11 +620,47 @@ def get_model_performance():
 @app.get("/model-performance/detailed")
 def get_detailed_performance():
     """Get detailed list of all predictions with results"""
+    cached = _cache_get("model-performance-detailed", ttl=60)
+    if cached is not None:
+        return cached
+
     db = SessionLocal()
     
     try:
         predictions = db.query(ModelPrediction).order_by(ModelPrediction.timestamp.desc()).all()
-        
+
+        # --- Pre-fetch all event date info in two bulk queries ---
+        # Map: event_name -> event_date (for predictions that have pred.event set)
+        event_date_rows = (
+            db.query(FightResult.event, FightResult.event_date)
+            .filter(FightResult.event.isnot(None), FightResult.event_date.isnot(None))
+            .all()
+        )
+        event_date_map: dict[str, any] = {}
+        for row in event_date_rows:
+            event_date_map.setdefault(row.event, row.event_date)
+
+        # Map: (fighter_name, opponent_name) -> {event, event_date} for legacy rows (pred.event is None)
+        fight_result_rows = (
+            db.query(
+                FightResult.fighter_name,
+                FightResult.opponent_name,
+                FightResult.event,
+                FightResult.event_date,
+            )
+            .filter(FightResult.event_date.isnot(None))
+            .order_by(FightResult.id.desc())
+            .all()
+        )
+        fight_pair_map: dict[tuple, dict] = {}
+        for row in fight_result_rows:
+            for key in ((row.fighter_name, row.opponent_name), (row.opponent_name, row.fighter_name)):
+                if key not in fight_pair_map:
+                    fight_pair_map[key] = {
+                        "event": row.event,
+                        "event_date": _format_event_date(row.event_date),
+                    }
+
         def safe_float(v):
             if v is None:
                 return None
@@ -601,23 +671,18 @@ def get_detailed_performance():
 
         detailed_results = []
         for pred in predictions:
-            # Use the event stored on the prediction directly (set for all new predictions).
-            # For pre-migration rows (event is None), fall back to the FightResult lookup.
             if pred.event:
-                date_row = (
-                    db.query(FightResult.event_date)
-                    .filter(
-                        FightResult.event == pred.event,
-                        FightResult.event_date.isnot(None),
-                    )
-                    .first()
-                )
+                raw_date = event_date_map.get(pred.event)
                 event_info = {
                     "event": pred.event,
-                    "event_date": date_row.event_date if date_row else None,
+                    "event_date": _format_event_date(raw_date) if raw_date else None,
                 }
             else:
-                event_info = _get_prediction_event_info(db, pred.fighter_a, pred.fighter_b)
+                event_info = fight_pair_map.get(
+                    (pred.fighter_a, pred.fighter_b),
+                    fight_pair_map.get((pred.fighter_b, pred.fighter_a), {"event": None, "event_date": None}),
+                )
+
             detailed_results.append({
                 "id": pred.id,
                 "fighter_a": pred.fighter_a,
@@ -634,11 +699,13 @@ def get_detailed_performance():
                 "event": event_info["event"],
                 "event_date": event_info["event_date"],
             })
-        
-        return {
+
+        result = {
             "predictions": detailed_results,
-            "total_count": len(detailed_results)
+            "total_count": len(detailed_results),
         }
+        _cache_set("model-performance-detailed", result)
+        return result
     
     finally:
         db.close()
@@ -676,7 +743,11 @@ def update_fight_result(
         # scraping system handles that table with its own schema
         
         db.commit()
-        
+
+        # Bust performance caches so the next load reflects the new result immediately
+        _cache.pop("model-performance", None)
+        _cache.pop("model-performance-detailed", None)
+
         return {
             "message": f"Updated {updated_count} predictions",
             "predictions_updated": updated_count,
